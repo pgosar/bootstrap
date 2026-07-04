@@ -1,7 +1,11 @@
 .env
+.env.*
 *.env
+!.env.example
 !*.example.env
 !*.env.example
+!nas/qemu/qemu-nas.env
+!*.example
 !**/*.example.env
 !**/*.env.example
 *.local
@@ -19,3 +23,10 @@ private/
 nas-bootstrap.env
 __pycache__/
 *.pyc
+nas/.work/
+nas/qemu/work/
+nas/qemu/logs/
+.qemu-nas-test/
+*.qcow2
+OVMF_VARS.fd
+*.iso
