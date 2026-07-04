@@ -1,0 +1,141 @@
+DEFAULT_ENV_FILE="$NAS_ROOT/.env"
+EXAMPLE_ENV_FILE="$NAS_ROOT/.env.example"
+STAGING_DIR="$NAS_ROOT/.work/bootstrap"
+AUR_BUILD_DIR="/var/cache/nas-bootstrap/aur"
+CONFIRM_PHRASE="yes, do as I say"
+
+PACMAN_PACKAGES=(
+  base-devel
+  linux
+  linux-firmware
+  intel-ucode
+  grub
+  efibootmgr
+  git
+  python
+  vim
+  neovim
+  tmux
+  openssh
+  inetutils
+  rsync
+  curl
+  wget
+  jq
+  smartmontools
+  nvme-cli
+  hdparm
+  lsscsi
+  sg3_utils
+  btrfs-progs
+  docker
+  docker-compose
+  tailscale
+  samba
+  ufw
+  nftables
+  btrbk
+  restic
+  age
+  gocryptfs
+  msmtp
+  mailutils
+  cronie
+  pacman-contrib
+  networkmanager
+  sudo
+  snapper
+  snap-pac
+  grub-btrfs
+  inotify-tools
+  dosfstools
+  gptfdisk
+)
+
+AUR_PACKAGES=(yay mergerfs snapraid)
+BTRFS_DATA_MOUNT_OPTS="rw,noatime,compress=zstd:3,space_cache=v2"
+BTRFS_DATA_FSTAB_OPTS="$BTRFS_DATA_MOUNT_OPTS,nofail,x-systemd.device-timeout=10s"
+BTRFS_OS_MOUNT_OPTS="rw,noatime,compress=zstd:3,space_cache=v2"
+OS_SUBVOL_TEMP_MOUNT="/mnt/.nas-bootstrap-rootfs"
+TARGET_MODE="host"
+
+POOL_SUBVOLUMES=(
+  media
+  downloads
+  personal
+  replicas
+  secrets
+  staging
+  appdata-bulk
+  docker
+  backups
+)
+
+APPLY=false
+INSTALL_ARCH=false
+PARTITION_OS_DISK=false
+PACKAGES=false
+STORAGE=false
+SERVICES=false
+ENABLE_SERVICES=false
+START_SERVICES=false
+CHECK_LIVE_TARGET=false
+CHECK_HEALTH=false
+ALL=false
+INIT_ENV=false
+LIST_DISKS=false
+ENV_FILE="$DEFAULT_ENV_FILE"
+CLI_TARGET_MODE=""
+CLI_TARGET_ROOT=""
+CLI_START_SERVICES=false
+LOADED_REAL_ENV=false
+LOADED_EXAMPLE_ENV=false
+DESTRUCTIVE_CONFIRMED=false
+
+NAS_HOSTNAME="nas"
+TIMEZONE="America/Los_Angeles"
+LOCALE="en_US.UTF-8"
+OS_DISK="/dev/disk/by-id/REPLACE_ME_OS_DISK"
+EFI_PARTITION="/dev/disk/by-id/REPLACE_ME_OS_DISK-part1"
+ROOT_PARTITION="/dev/disk/by-id/REPLACE_ME_OS_DISK-part2"
+TARGET_ROOT="/mnt"
+BOOTLOADER="grub"
+GRUB_BOOTLOADER_ID="ArchNAS"
+INSTALL_INTEL_UCODE="true"
+declare -a DATA_DISKS=()
+declare -a DATA_DISK_LABELS=()
+PARITY_DISK="/dev/disk/by-id/REPLACE_ME_PARITY_DISK"
+PARITY_LABEL="nas-parity"
+PARITY_MOUNT="/mnt/parity"
+MERGERFS_MOUNT="/data"
+DATA_ROOT=""
+SNAPSHOT_VIEW_MOUNT="/mnt/snapshots"
+MERGERFS_MIN_FREE_SPACE="100G"
+MERGERFS_CREATE_POLICY="mfs"
+DOCKER_ROOT="/data/docker"
+DOCKER_COMPOSE_DIR="/data/docker/compose"
+DOCKER_APPDATA_DIR="/data/docker/appdata"
+NAS_USER="nasuser"
+NAS_GROUP="nas"
+PUID="1000"
+PGID="1000"
+TAILSCALE_ENABLE="true"
+SMB_ENABLE="true"
+DOCKER_ENABLE="true"
+SNAPRAID_ENABLE="true"
+BTRBK_ENABLE="true"
+SNAPPER_ENABLE="true"
+GRUB_BTRFS_ENABLE="true"
+START_SERVICES_AFTER_ENABLE="false"
+SNAPPER_CONFIG_NAME="root"
+SNAPPER_INITIAL_SNAPSHOT_DESCRIPTION="initial Arch NAS install"
+ALLOW_RAW_DEV_PATHS="false"
+ALLOW_QEMU_DEVICE_NAMES="false"
+DISK_LAYOUT_REVIEWED="false"
+VALIDATE_WRITE_TESTS="false"
+FIREWALL_ENABLE="true"
+FIREWALL_LAN_CIDRS="192.168.0.0/16 10.0.0.0/8 172.16.0.0/12 100.64.0.0/10"
+SMART_ENABLE="true"
+JOURNALD_SYSTEM_MAX_USE="1G"
+JOURNALD_RUNTIME_MAX_USE="256M"
+JOURNALD_MAX_RETENTION_SEC="1month"
