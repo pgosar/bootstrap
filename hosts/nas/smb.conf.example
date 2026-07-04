@@ -1,0 +1,37 @@
+[global]
+   workgroup = WORKGROUP
+   server string = NAS
+   security = user
+   map to guest = Bad User
+   server min protocol = SMB2
+   logging = systemd
+   load printers = no
+   disable spoolss = yes
+   smb ports = 445
+
+[media]
+   path = /data/media
+   browseable = yes
+   read only = no
+   valid users = @nas
+   create mask = 0664
+   directory mask = 0775
+
+[personal]
+   path = /data/personal
+   browseable = yes
+   read only = no
+   valid users = @nas
+   create mask = 0660
+   directory mask = 0770
+
+[downloads]
+   path = /data/downloads
+   browseable = yes
+   read only = no
+   valid users = @nas
+   create mask = 0664
+   directory mask = 0775
+
+# Do not export /data/secrets.
+

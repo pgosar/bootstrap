@@ -1,0 +1,11 @@
+[Unit]
+Description=Run SnapRAID sync about every 12 hours
+
+[Timer]
+OnCalendar=*-*-* 03,15:15:00
+RandomizedDelaySec=45m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+

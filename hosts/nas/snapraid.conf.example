@@ -1,0 +1,29 @@
+# Example only. Copy to /etc/snapraid.conf after replacing disk paths.
+# Parity disk is dedicated and never part of mergerfs.
+
+parity /mnt/parity/snapraid.parity
+
+content /var/lib/snapraid/content
+content /mnt/disk1/snapraid.content
+content /mnt/disk2/snapraid.content
+content /mnt/disk3/snapraid.content
+
+data d1 /mnt/disk1/pool/
+data d2 /mnt/disk2/pool/
+data d3 /mnt/disk3/pool/
+
+exclude *.unrecoverable
+exclude /tmp/
+exclude /lost+found/
+exclude downloads/
+exclude staging/
+exclude snapshots/
+exclude .snapshots/
+exclude #recycle/
+exclude appdata-bulk/transient/
+exclude docker/appdata/*/cache/
+exclude docker/appdata/*/transcode/
+
+# TODO: replace direct timer sync with a guarded wrapper that refuses large
+# delete counts unless explicitly approved.
+

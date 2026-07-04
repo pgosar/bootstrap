@@ -1,0 +1,41 @@
+# Example btrbk policy. Snapshots live outside the mergerfs pool.
+# Edit retention before applying to a real NAS.
+
+timestamp_format        long
+snapshot_preserve_min   2d
+snapshot_preserve       48h 14d 8w 6m
+transaction_log         /var/log/btrbk.log
+lockfile                /run/lock/btrbk.lock
+
+volume /mnt/disk1
+  snapshot_dir snapshots
+  subvolume pool/personal
+  subvolume pool/replicas
+  subvolume pool/docker
+  subvolume pool/secrets
+    snapshot_preserve 72h 30d 12w 12m
+  subvolume pool/media
+    snapshot_preserve 7d 8w 6m
+
+volume /mnt/disk2
+  snapshot_dir snapshots
+  subvolume pool/personal
+  subvolume pool/replicas
+  subvolume pool/docker
+  subvolume pool/secrets
+    snapshot_preserve 72h 30d 12w 12m
+  subvolume pool/media
+    snapshot_preserve 7d 8w 6m
+
+volume /mnt/disk3
+  snapshot_dir snapshots
+  subvolume pool/personal
+  subvolume pool/replicas
+  subvolume pool/docker
+  subvolume pool/secrets
+    snapshot_preserve 72h 30d 12w 12m
+  subvolume pool/media
+    snapshot_preserve 7d 8w 6m
+
+# downloads and staging are intentionally omitted.
+

@@ -1,0 +1,10 @@
+[Unit]
+Description=btrbk btrfs snapshots
+Documentation=man:btrbk(1)
+RequiresMountsFor=/mnt/disk1 /mnt/disk2 /mnt/disk3
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/btrbk -c /etc/btrbk/btrbk.conf run
+

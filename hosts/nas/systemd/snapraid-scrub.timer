@@ -1,0 +1,11 @@
+[Unit]
+Description=Run SnapRAID partial scrub weekly
+
+[Timer]
+OnCalendar=Sun 04:30
+RandomizedDelaySec=2h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+
