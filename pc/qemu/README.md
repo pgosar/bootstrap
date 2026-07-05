@@ -30,3 +30,6 @@ check directly.
 
 The QEMU env file `pc/qemu/qemu-pc.env` is disposable test configuration only.
 It is safe to use for the fake disk harness, not for real hardware.
+
+The harness creates a throwaway SSH key in `pc/qemu/work/` for post-reboot
+automation. It does not set or store VM passwords.

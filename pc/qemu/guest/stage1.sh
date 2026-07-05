@@ -21,7 +21,6 @@ REPO_ROOT="/repo"
 PC_ROOT="$REPO_ROOT/pc"
 ENV_FILE="$PC_ROOT/qemu/qemu-pc.env"
 PUBKEY_URL="${PC_QEMU_SSH_PUBKEY_URL:-http://10.0.2.2:18080/id_ed25519.pub}"
-QEMU_PASSWORD="${PC_QEMU_PASSWORD:-qemu}"
 
 printf '[pc-qemu-stage1] starting live ISO install stage\n'
 timedatectl set-ntp true || true
@@ -50,10 +49,6 @@ printf '%s\n' 'yes, do as I say' | "$PC_ROOT/bin/bootstrap-pc.sh" \
 install -d -m 0700 /mnt/root/.ssh
 if curl -fsSL "$PUBKEY_URL" -o /mnt/root/.ssh/authorized_keys; then
   chmod 0600 /mnt/root/.ssh/authorized_keys
-fi
-
-if [[ -n "$QEMU_PASSWORD" ]]; then
-  arch-chroot /mnt bash -lc "printf '%s:%s\n%s:%s\n' root '$QEMU_PASSWORD' '$PC_USER' '$QEMU_PASSWORD' | chpasswd"
 fi
 
 "$PC_ROOT/bin/bootstrap-pc.sh" \
