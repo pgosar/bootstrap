@@ -300,13 +300,14 @@ require_non_placeholder_var() {
 }
 
 require_non_placeholder_array() {
-  local name="$1" value count idx
-  eval "count=\${#$name[@]}"
+  local name="$1" value idx
+  local -n array_ref="$name"
+  local count="${#array_ref[@]}"
   [[ "$count" -gt 0 ]] || die "required config array is empty: $name"
   for ((idx = 0; idx < count; idx++)); do
-    eval "value=\${$name[$idx]}"
+    value="${array_ref[$idx]}"
     if is_placeholder "$value"; then
-      die "required config array contains placeholder: $name[$idx]=$value"
+      die "required config array contains placeholder: ${name}[$idx]=$value"
     fi
   done
 }
@@ -455,7 +456,8 @@ confirm_destructive() {
 }
 
 write_fresh_install_fstab() {
-  local target_root="$1" fstab="$target_root/etc/fstab"
+  local target_root="$1"
+  local fstab="$target_root/etc/fstab"
   log "+ generate fresh install fstab at $fstab"
   if [[ "$APPLY" == true ]]; then
     [[ -e "$fstab" ]] && backup_file "$fstab"

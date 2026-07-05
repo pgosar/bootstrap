@@ -71,14 +71,14 @@ cleanup() {
 trap cleanup EXIT
 
 base_qemu_args=(
-  "${KVM_ARGS[@]}" \
-  -m 4096 \
-  -smp 4 \
-  -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE" \
-  -drive if=pflash,format=raw,file="$WORKDIR/OVMF_VARS.fd" \
-  -virtfs local,path="$REPO_ROOT",mount_tag=repo,security_model=none,readonly=on \
-  -netdev user,id=net0,hostfwd=tcp::"$SSH_PORT"-:22 \
-  -device virtio-net-pci,netdev=net0 \
+  "${KVM_ARGS[@]}"
+  -m 4096
+  -smp 4
+  -drive "if=pflash,format=raw,readonly=on,file=$OVMF_CODE"
+  -drive "if=pflash,format=raw,file=$WORKDIR/OVMF_VARS.fd"
+  -virtfs "local,path=$REPO_ROOT,mount_tag=repo,security_model=none,readonly=on"
+  -netdev "user,id=net0,hostfwd=tcp::$SSH_PORT-:22"
+  -device "virtio-net-pci,netdev=net0"
   -display none
 )
 
