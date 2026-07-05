@@ -5,6 +5,7 @@
 !*.example.env
 !*.env.example
 !nas/qemu/qemu-nas.env
+!pc/qemu/qemu-pc.env
 !*.example
 !**/*.example.env
 !**/*.env.example
@@ -21,6 +22,12 @@ private/
 *.sqlite3
 *.bak
 nas-bootstrap.env
+.work/
+pc/.work/
+pc/qemu/work/
+pc/qemu/logs/
+pc/qemu/*.qcow2
+pc/qemu/OVMF_VARS.fd
 __pycache__/
 *.pyc
 nas/.work/

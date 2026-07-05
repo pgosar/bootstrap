@@ -1,0 +1,12 @@
+# AUR packages installed after yay is bootstrapped in the target OS.
+# Format: package expected-version
+accounts-qml-module 0.7-8
+gdlauncher-carbon-bin 2.0.30-5
+hstr 3.2-1
+jdupes 1.31.1-1
+jellyfin-desktop-git 1:0.r1037.225af09-1
+libjodycode 4.1.2-1
+pacman-static 7.1.0.r9.g54d9411-13
+spicetify-bin 2.43.2-1
+spotify 1:1.2.92.147-1
+wl-gammarelay-rs 1.0.1-1
