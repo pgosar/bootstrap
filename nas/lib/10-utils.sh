@@ -167,6 +167,18 @@ target_unit_exists() {
   fi
 }
 
+ensure_target_resolver() {
+  [[ "$TARGET_MODE" == "live" ]] || return 0
+  ensure_dir "$TARGET_ROOT/etc"
+  if [[ "$APPLY" == true ]]; then
+    rm -f "$TARGET_ROOT/etc/resolv.conf"
+    cp -L /etc/resolv.conf "$TARGET_ROOT/etc/resolv.conf"
+  else
+    log "+ rm -f $(printf '%q' "$TARGET_ROOT/etc/resolv.conf")"
+    log "+ cp -L /etc/resolv.conf $(printf '%q' "$TARGET_ROOT/etc/resolv.conf")"
+  fi
+}
+
 check_run_target() {
   if [[ "$TARGET_MODE" == "live" ]]; then
     arch-chroot "$TARGET_ROOT" "$@"
@@ -401,14 +413,15 @@ split_csv_array_if_needed() {
   declaration="$(declare -p "$name" 2>/dev/null || true)"
   [[ "$declaration" == declare\ -a* || "$declaration" == declare\ -x\ -a* ]] || return 0
 
-  eval "local count=\${#$name[@]}"
+  local -n array_ref="$name"
+  local count="${#array_ref[@]}"
   if [[ "$count" == "1" ]]; then
-    eval "local first=\${$name[0]}"
+    local first="${array_ref[0]}"
     if [[ "$first" == *,* ]]; then
       local old_ifs="$IFS"
       IFS=,
       # shellcheck disable=SC2206
-      eval "$name=( \$first )"
+      array_ref=( $first )
       IFS="$old_ifs"
     fi
   fi

@@ -26,6 +26,7 @@ install_packages() {
   log "Package list:"
   printf '  %s\n' "${PACMAN_PACKAGES[@]}"
   if [[ "$APPLY" == true ]]; then
+    ensure_target_resolver
     check_pacman_packages_available "${PACMAN_PACKAGES[@]}"
     target_run pacman -Syu --needed --noconfirm "${PACMAN_PACKAGES[@]}"
   fi
@@ -129,4 +130,3 @@ install_aur_packages() {
   done
   return 0
 }
-

@@ -134,7 +134,7 @@ cp "$OVMF_VARS_TEMPLATE" "$OVMF_VARS"
 
 STAGED_REPO="$HTTP_DIR/bootstrap-src"
 rm -rf "$STAGED_REPO"
-mkdir -p "$STAGED_REPO/nas/qemu"
+mkdir -p "$STAGED_REPO/nas/qemu/guest" "$STAGED_REPO/nas/qemu/checks"
 cp -a "$NAS_DIR/bootstrap-nas.sh" "$STAGED_REPO/nas/bootstrap-nas.sh"
 cp -a "$NAS_DIR/lib" "$STAGED_REPO/nas/lib"
 cp -a "$NAS_DIR/config" "$STAGED_REPO/nas/config"
@@ -199,7 +199,7 @@ qemu_devices=(
   -drive "if=none,id=parity,format=qcow2,file=$WORKDIR/nas-parity.qcow2"
   -device "virtio-blk-pci,drive=parity,serial=parity"
   -netdev "user,id=n0,hostfwd=tcp::$QEMU_SSH_PORT-:22"
-  -device virtio-net-pci,netdev=n0
+  -device "virtio-net-pci,netdev=n0"
 )
 
 INSTALL_LOG="$LOG_DIR/qemu-install.log"

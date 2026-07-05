@@ -3,7 +3,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 NAS_ROOT="$SCRIPT_DIR"
-REPO_ROOT="$(cd -- "$NAS_ROOT/.." && pwd)"
 
 for lib in \
   00-defaults.sh \

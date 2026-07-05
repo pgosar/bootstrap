@@ -184,6 +184,7 @@ install_arch_system() {
     check_host_pacman_packages_available "${pacstrap_packages[@]}"
   fi
   run pacstrap -K "$TARGET_ROOT" "${pacstrap_packages[@]}"
+  ensure_target_resolver
   write_fresh_install_fstab "$TARGET_ROOT"
   run arch-chroot "$TARGET_ROOT" ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
   run arch-chroot "$TARGET_ROOT" hwclock --systohc

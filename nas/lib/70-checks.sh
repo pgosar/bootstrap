@@ -227,6 +227,15 @@ check_unit_active() {
   fi
 }
 
+check_unit_not_failed() {
+  local unit="$1"
+  if check_run_target systemctl is-failed "$unit" >/dev/null 2>&1; then
+    check_fail "$unit is not failed"
+  else
+    check_pass "$unit is not failed"
+  fi
+}
+
 check_btrfs_subvolume() {
   local path="$1"
   if ! command -v btrfs >/dev/null 2>&1; then
@@ -358,6 +367,11 @@ check_common_packages() {
     check_package_installed "$package"
   done
   [[ "$GRUB_BTRFS_ENABLE" == "true" ]] && check_package_installed grub-btrfs
+  if check_run_target pacman -Q ufw >/dev/null 2>&1; then
+    check_fail "ufw package is not installed on NAS"
+  else
+    check_pass "ufw package is not installed on NAS"
+  fi
 }
 
 check_common_grub_snapper() {
@@ -402,6 +416,7 @@ check_common_docker() {
   check_path_exists "$docker_override"
   check_file_contains_literal "$docker_override" "RequiresMountsFor=$MERGERFS_MOUNT" "Docker waits for $MERGERFS_MOUNT"
   check_file_contains_literal "$docker_override" "After=network-online.target" "Docker waits for network-online target"
+  check_file_contains_literal "$docker_override" "Docker published ports are explicit exposure" "Docker exposure stance documented"
   check_unit_enabled docker true
   if [[ "$TARGET_MODE" == "host" ]]; then
     if systemctl cat docker 2>/dev/null | grep -F "RequiresMountsFor=$MERGERFS_MOUNT" >/dev/null; then
@@ -516,7 +531,12 @@ check_common_services() {
     check_path_exists "$(target_path /etc/nftables.conf)"
     check_unit_enabled nftables.service true
     if [[ "$TARGET_MODE" == "host" ]]; then
-      check_unit_active nftables.service true
+      check_unit_not_failed nftables.service
+      if check_run_target nft -c -f /etc/nftables.conf >/dev/null 2>&1; then
+        check_pass "nftables config validates"
+      else
+        check_fail "nftables config validates"
+      fi
       if check_run_target nft list ruleset >/dev/null 2>&1; then
         check_pass "nft list ruleset succeeds"
       else
@@ -528,10 +548,10 @@ check_common_services() {
     check_path_exists "$(target_path /etc/smartd.conf)"
     check_unit_enabled smartd.service true
     if [[ "$TARGET_MODE" == "host" ]]; then
-      check_unit_active smartd.service true
       local smart_scan
       smart_scan="$(check_run_target smartctl --scan-open 2>/dev/null || true)"
       if [[ -n "$smart_scan" ]]; then
+        check_unit_active smartd.service true
         check_pass "SMART devices detected"
       else
         check_warn "SMART devices unavailable; likely QEMU virtio or unsupported controller"
@@ -548,6 +568,7 @@ check_common_services() {
   else
     check_fail "nas-notify helper is executable"
   fi
+  check_file_contains_literal "$(target_path /usr/local/sbin/nas-notify)" "Placeholder notification helper" "nas-notify is clearly marked placeholder"
   if [[ "$GRUB_BTRFS_ENABLE" == "true" ]]; then
     check_unit_enabled grub-btrfsd.service false
   fi

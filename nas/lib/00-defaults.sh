@@ -32,7 +32,6 @@ PACMAN_PACKAGES=(
   docker-compose
   tailscale
   samba
-  ufw
   nftables
   btrbk
   restic
@@ -64,6 +63,9 @@ POOL_SUBVOLUMES=(
   downloads
   personal
   replicas
+  # Sensitive material lives here, but encryption setup is intentionally a
+  # later explicit phase. Do not mount decrypted secrets into containers or
+  # export this path through Samba.
   secrets
   staging
   appdata-bulk

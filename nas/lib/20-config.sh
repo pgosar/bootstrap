@@ -100,13 +100,14 @@ require_non_placeholder_var() {
 
 require_non_placeholder_array() {
   local name="$1"
-  local index value count
-  eval "count=\${#$name[@]}"
+  local index value
+  local -n array_ref="$name"
+  local count="${#array_ref[@]}"
   [[ "$count" -gt 0 ]] || die "required config array is empty: $name"
   for ((index = 0; index < count; index++)); do
-    eval "value=\${$name[$index]}"
+    value="${array_ref[$index]}"
     if is_placeholder "$value"; then
-      die "required config array contains placeholder: $name[$index]=$value"
+      die "required config array contains placeholder: ${name}[$index]=$value"
     fi
   done
 }
