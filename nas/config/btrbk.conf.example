@@ -3,39 +3,62 @@
 
 timestamp_format        long
 snapshot_preserve_min   2d
-snapshot_preserve       48h 14d 8w 6m
+snapshot_preserve       24h 14d 4w
 transaction_log         /var/log/btrbk.log
 lockfile                /run/lock/btrbk.lock
 
 volume /mnt/disk1
   snapshot_dir snapshots
+
   subvolume pool/personal
+    snapshot_preserve 48h 30d
+
   subvolume pool/replicas
+    snapshot_preserve 48h 14d 4w
+
   subvolume pool/docker
+    snapshot_preserve 24h 7d 4w
+
   subvolume pool/secrets
-    snapshot_preserve 72h 30d 12w 12m
+    snapshot_preserve 72h 30d
+
   subvolume pool/media
-    snapshot_preserve 7d 8w 6m
+    snapshot_preserve 24h 7d 4w
 
 volume /mnt/disk2
   snapshot_dir snapshots
+
   subvolume pool/personal
+    snapshot_preserve 48h 30d
+
   subvolume pool/replicas
+    snapshot_preserve 48h 14d 4w
+
   subvolume pool/docker
+    snapshot_preserve 24h 7d 4w
+
   subvolume pool/secrets
-    snapshot_preserve 72h 30d 12w 12m
+    snapshot_preserve 72h 30d
+
   subvolume pool/media
-    snapshot_preserve 7d 8w 6m
+    snapshot_preserve 24h 7d 4w
 
 volume /mnt/disk3
   snapshot_dir snapshots
+
   subvolume pool/personal
+    snapshot_preserve 48h 30d
+
   subvolume pool/replicas
+    snapshot_preserve 48h 14d 4w
+
   subvolume pool/docker
+    snapshot_preserve 24h 7d 4w
+
   subvolume pool/secrets
-    snapshot_preserve 72h 30d 12w 12m
+    snapshot_preserve 72h 30d
+
   subvolume pool/media
-    snapshot_preserve 7d 8w 6m
+    snapshot_preserve 24h 7d 4w
 
 # downloads and staging are intentionally omitted.
-

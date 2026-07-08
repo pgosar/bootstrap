@@ -24,6 +24,6 @@ exclude appdata-bulk/transient/
 exclude docker/appdata/*/cache/
 exclude docker/appdata/*/transcode/
 
-# TODO: replace direct timer sync with a guarded wrapper that refuses large
-# delete counts unless explicitly approved.
+# Timer sync is managed via a guarded wrapper script (/usr/local/bin/snapraid-sync.sh)
+# which refuses syncs with large delete counts (>50) unless run with --force.
 

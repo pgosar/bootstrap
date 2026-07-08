@@ -36,3 +36,35 @@
 # Do not export /data/secrets. It is reserved for sensitive material; choose an
 # explicit encryption workflow later and never mount decrypted secrets into
 # Docker containers.
+
+[replicas]
+   path = /data/replicas
+   browseable = yes
+   read only = no
+   valid users = @nas
+   create mask = 0660
+   directory mask = 0770
+
+[backups]
+   path = /data/backups
+   browseable = yes
+   read only = no
+   valid users = @nas
+   create mask = 0660
+   directory mask = 0770
+
+[appdata-bulk]
+   path = /data/appdata-bulk
+   browseable = yes
+   read only = no
+   valid users = @nas
+   create mask = 0660
+   directory mask = 0770
+
+[staging]
+   path = /data/staging
+   browseable = yes
+   read only = no
+   valid users = @nas
+   create mask = 0660
+   directory mask = 0770

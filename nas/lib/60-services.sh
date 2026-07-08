@@ -94,11 +94,16 @@ configure_snapraid() {
   ensure_dir "$(target_path /var/lib/snapraid)"
   run chown root:root "$(target_path /var/lib/snapraid)"
   run chmod 0755 "$(target_path /var/lib/snapraid)"
+
+  # Install the guarded sync script
+  ensure_dir "$(target_path /usr/local/bin)"
+  copy_with_backup "$NAS_ROOT/config/snapraid-sync.sh" "$(target_path /usr/local/bin/snapraid-sync.sh)"
+  run chmod 0755 "$(target_path /usr/local/bin/snapraid-sync.sh)"
+
   local unit
   for unit in snapraid-sync.service snapraid-sync.timer snapraid-scrub.service snapraid-scrub.timer; do
     copy_with_backup "$NAS_ROOT/config/systemd/$unit" "$(target_path "/etc/systemd/system/$unit")"
   done
-  warn "SnapRAID sync is not started automatically. Review deletion guard TODO first."
 }
 
 configure_btrbk() {
@@ -183,6 +188,13 @@ enable_services() {
       target_run systemctl start nftables
     fi
   fi
+  if [[ "$ENABLE_UFW" == "true" ]]; then
+    target_run systemctl enable ufw
+    if [[ "$START_SERVICES" == true && "$TARGET_MODE" == "host" ]]; then
+      target_run systemctl start ufw
+    fi
+  fi
+
   target_run systemctl enable systemd-timesyncd.service
   if [[ "$START_SERVICES" == true && "$TARGET_MODE" == "host" ]]; then
     target_run systemctl start systemd-timesyncd.service
