@@ -29,12 +29,18 @@ configure_data_disk() {
 
   ensure_dir "$active_mountpoint/pool"
   ensure_dir "$active_mountpoint/snapshots"
+  run chown "$PUID:$PGID" "$active_mountpoint/pool"
+  run chmod 0775 "$active_mountpoint/pool"
   local subvol
   for subvol in "${POOL_SUBVOLUMES[@]}"; do
     if [[ -d "$active_mountpoint/pool/$subvol" ]]; then
+      run chown "$PUID:$PGID" "$active_mountpoint/pool/$subvol"
+      run chmod 0775 "$active_mountpoint/pool/$subvol"
       continue
     fi
     run btrfs subvolume create "$active_mountpoint/pool/$subvol"
+    run chown "$PUID:$PGID" "$active_mountpoint/pool/$subvol"
+    run chmod 0775 "$active_mountpoint/pool/$subvol"
   done
 }
 
@@ -288,6 +294,17 @@ verify_active_pool_visible() {
   done
 }
 
+ensure_active_pool_permissions() {
+  local active_data subvol
+  active_data="$(active_mount_path "$MERGERFS_MOUNT")"
+  run chown "$PUID:$PGID" "$active_data"
+  run chmod 0775 "$active_data"
+  for subvol in "${POOL_SUBVOLUMES[@]}"; do
+    run chown "$PUID:$PGID" "$active_data/$subvol"
+    run chmod 0775 "$active_data/$subvol"
+  done
+}
+
 verify_active_pool_writable() {
   [[ "$VALIDATE_WRITE_TESTS" == "true" ]] || return 0
   local active_data test_path
@@ -341,6 +358,7 @@ configure_storage() {
     run findmnt "$active_snapshot_mount"
     ensure_live_mergerfs_healthy
     verify_active_pool_visible
+    ensure_active_pool_permissions
     verify_active_pool_writable
   fi
 }

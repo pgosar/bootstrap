@@ -43,6 +43,39 @@ nas/bootstrap-nas.sh --list-disks
 It supports a dry-run/default review mode, a one-phase live ISO install, and
 read-only live-target / post-boot health checks.
 
+Recommended NAS install from the Arch ISO:
+
+```bash
+nas/bootstrap-nas.sh --init-env
+$EDITOR nas/.env
+nas/bootstrap-nas.sh --list-disks
+sudo nas/bootstrap-nas.sh \
+  --env-file nas/.env \
+  --target-mode live \
+  --target-root /mnt \
+  --apply \
+  --all
+```
+
+That command installs Arch into `/mnt`, partitions the configured OS disk, sets
+up packages, storage, services, and systemd enablement in the target system.
+Formatting still requires typing `yes, do as I say`.
+
+Before rebooting, run the live target check:
+
+```bash
+sudo nas/bootstrap-nas.sh --env-file nas/.env --check-live-target
+```
+
+After booting into the installed NAS OS:
+
+```bash
+sudo nas/bootstrap-nas.sh --env-file nas/.env --check-health
+```
+
+If `--all` runs in `TARGET_MODE=host`, it performs installed-OS setup only and
+skips Arch install/OS partitioning. From the Arch ISO, use `--target-mode live`.
+
 ## PC entrypoints
 
 `pc/bin/bootstrap-pc.sh` is the workstation installer.

@@ -59,13 +59,17 @@ Common first run:
   nas/bootstrap-nas.sh --init-env
   \$EDITOR nas/.env
   nas/bootstrap-nas.sh --list-disks
-  sudo nas/bootstrap-nas.sh --dry-run --all
+  sudo nas/bootstrap-nas.sh --target-mode live --target-root /mnt --dry-run --all
 
-Apply the full NAS host setup:
+Apply installed-OS host setup after reboot:
   sudo nas/bootstrap-nas.sh --apply --all
 
 Minimal Arch install from the ISO:
-  sudo nas/bootstrap-nas.sh --apply --install-arch --partition-os-disk
+  sudo nas/bootstrap-nas.sh \\
+    --target-root /mnt \\
+    --apply \\
+    --install-arch \\
+    --partition-os-disk
 
 Full one-phase install from the Arch ISO:
   sudo /repo/nas/bootstrap-nas.sh \\
@@ -207,6 +211,11 @@ require_cmd() {
 is_placeholder() {
   local value="${1:-}"
   [[ -z "$value" || "$value" == *REPLACE_ME* || "$value" == *CHANGEME* || "$value" == *TODO* || "$value" == *example* ]]
+}
+
+running_from_arch_iso() {
+  [[ -d /run/archiso ]] && return 0
+  grep -qw archiso /proc/cmdline 2>/dev/null
 }
 
 init_env() {
@@ -413,16 +422,23 @@ split_csv_array_if_needed() {
   declaration="$(declare -p "$name" 2>/dev/null || true)"
   [[ "$declaration" == declare\ -a* || "$declaration" == declare\ -x\ -a* ]] || return 0
 
-  local -n array_ref="$name"
-  local count="${#array_ref[@]}"
+  local count
+  eval "count=\${#$name[@]}"
   if [[ "$count" == "1" ]]; then
-    local first="${array_ref[0]}"
+    local first
+    eval "first=\${$name[0]}"
     if [[ "$first" == *,* ]]; then
       local old_ifs="$IFS"
       IFS=,
-      # shellcheck disable=SC2206
-      array_ref=( $first )
+      local -a parts
+      read -r -a parts <<<"$first"
       IFS="$old_ifs"
+      eval "$name=()"
+      local item quoted
+      for item in "${parts[@]}"; do
+        printf -v quoted '%q' "$item"
+        eval "$name+=( $quoted )"
+      done
     fi
   fi
 }

@@ -19,9 +19,6 @@ load_config() {
   split_csv_array_if_needed DATA_DISKS
   split_csv_array_if_needed DATA_DISK_LABELS
 
-  if [[ -n "${DATA_ROOT:-}" ]]; then
-    MERGERFS_MOUNT="$DATA_ROOT"
-  fi
   if [[ "$START_SERVICES_AFTER_ENABLE" == "true" ]]; then
     START_SERVICES=true
   fi
@@ -62,6 +59,10 @@ resolve_phase_selection() {
     return 0
   fi
 
+  if running_from_arch_iso && [[ "$TARGET_MODE" == "host" && -z "$CLI_TARGET_MODE" ]]; then
+    die "--all is running from the Arch ISO, but TARGET_MODE=host would configure the temporary ISO and skip OS install. Re-run with: sudo nas/bootstrap-nas.sh --env-file nas/.env --target-mode live --target-root /mnt --apply --all"
+  fi
+
   PACKAGES=true
   STORAGE=true
   SERVICES=true
@@ -72,7 +73,7 @@ resolve_phase_selection() {
     PARTITION_OS_DISK=true
     warn "--all selected in TARGET_MODE=live: full ISO install enabled, including OS disk partitioning."
   else
-    warn "--all selected in TARGET_MODE=host: host setup only; OS install and partitioning skipped."
+    warn "--all selected in TARGET_MODE=host: running installed-OS host setup only. Arch install and OS disk partitioning are skipped."
   fi
 }
 
@@ -101,11 +102,11 @@ require_non_placeholder_var() {
 require_non_placeholder_array() {
   local name="$1"
   local index value
-  local -n array_ref="$name"
-  local count="${#array_ref[@]}"
+  local count
+  eval "count=\${#$name[@]}"
   [[ "$count" -gt 0 ]] || die "required config array is empty: $name"
   for ((index = 0; index < count; index++)); do
-    value="${array_ref[$index]}"
+    eval "value=\${$name[$index]}"
     if is_placeholder "$value"; then
       die "required config array contains placeholder: ${name}[$index]=$value"
     fi
