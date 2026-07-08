@@ -42,6 +42,22 @@ configure_data_disk() {
     run chown "$PUID:$PGID" "$active_mountpoint/pool/$subvol"
     run chmod 0775 "$active_mountpoint/pool/$subvol"
   done
+  # torrents lives inside media for hardlink compatibility with arr stack
+  ensure_dir "$active_mountpoint/pool/media/torrents"
+  run chown "$PUID:$PGID" "$active_mountpoint/pool/media/torrents"
+  run chmod 2775 "$active_mountpoint/pool/media/torrents"
+  ensure_torrents_symlink "$active_mountpoint/pool"
+}
+
+ensure_torrents_symlink() {
+  local pool_path="$1"
+  if [[ -L "$pool_path/torrents" ]] && [[ "$(readlink "$pool_path/torrents")" == "media/torrents" ]]; then
+    return 0
+  fi
+  if [[ -e "$pool_path/torrents" ]]; then
+    die "$pool_path/torrents exists but is not the expected media/torrents symlink"
+  fi
+  run ln -s media/torrents "$pool_path/torrents"
 }
 
 generate_fstab_text() {
@@ -109,7 +125,7 @@ generate_mergerfs_mount_units() {
   local data_unit snapshot_unit data_text snapshot_text
   data_unit="$(target_path "/etc/systemd/system/$(mount_unit_name_for_path "$MERGERFS_MOUNT")")"
   snapshot_unit="$(target_path "/etc/systemd/system/$(mount_unit_name_for_path "$SNAPSHOT_VIEW_MOUNT")")"
-  data_text="$(generate_mergerfs_mount_unit_text "$MERGERFS_MOUNT" pool "defaults,cache.files=off,category.create=$MERGERFS_CREATE_POLICY,moveonenospc=true,minfreespace=$MERGERFS_MIN_FREE_SPACE")"
+  data_text="$(generate_mergerfs_mount_unit_text "$MERGERFS_MOUNT" pool "defaults,cache.files=off,use_ino,ignorepponrename=true,category.create=$MERGERFS_CREATE_POLICY,moveonenospc=true,minfreespace=$MERGERFS_MIN_FREE_SPACE")"
   snapshot_text="$(generate_mergerfs_mount_unit_text "$SNAPSHOT_VIEW_MOUNT" snapshots "defaults,ro,cache.files=off")"
   write_text "$data_unit" "$data_text"
   write_text "$snapshot_unit" "$snapshot_text"
@@ -228,7 +244,7 @@ mount_live_mergerfs_explicit() {
   active_snapshot_mount="$(active_mount_path "$SNAPSHOT_VIEW_MOUNT")"
   mergerfs_bin="$TARGET_ROOT/usr/bin/mergerfs"
   mergerfs_lib_path="$TARGET_ROOT/usr/lib"
-  data_opts="defaults,cache.files=off,category.create=$MERGERFS_CREATE_POLICY,moveonenospc=true,minfreespace=$MERGERFS_MIN_FREE_SPACE"
+  data_opts="defaults,cache.files=off,use_ino,ignorepponrename=true,category.create=$MERGERFS_CREATE_POLICY,moveonenospc=true,minfreespace=$MERGERFS_MIN_FREE_SPACE"
   snapshot_opts="defaults,ro,cache.files=off"
 
   ensure_dir "$active_pool_mount"

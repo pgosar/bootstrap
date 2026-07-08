@@ -50,6 +50,7 @@ PACMAN_PACKAGES=(
   inotify-tools
   dosfstools
   gptfdisk
+  wol
 )
 
 AUR_PACKAGES=(yay mergerfs snapraid)
@@ -61,7 +62,6 @@ TARGET_MODE="host"
 
 POOL_SUBVOLUMES=(
   media
-  downloads
   personal
   replicas
   # Sensitive material lives here, but encryption setup is intentionally a
@@ -113,7 +113,7 @@ PARITY_MOUNT="/mnt/parity"
 MERGERFS_MOUNT="/data"
 SNAPSHOT_VIEW_MOUNT="/mnt/snapshots"
 MERGERFS_MIN_FREE_SPACE="100G"
-MERGERFS_CREATE_POLICY="mfs"
+MERGERFS_CREATE_POLICY="epmfs"
 DOCKER_ROOT="/data/docker"
 DOCKER_COMPOSE_DIR="/data/docker/compose"
 DOCKER_APPDATA_DIR="/data/docker/appdata"

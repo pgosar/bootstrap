@@ -61,4 +61,5 @@ volume /mnt/disk3
   subvolume pool/media
     snapshot_preserve 24h 7d 4w
 
-# downloads and staging are intentionally omitted.
+# torrents and iso-mirror live inside media and are excluded by snapraid.
+# staging is intentionally omitted from btrbk snapshots.

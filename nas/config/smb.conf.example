@@ -25,8 +25,8 @@
    create mask = 0660
    directory mask = 0770
 
-[downloads]
-   path = /data/downloads
+[torrents]
+   path = /data/torrents
    browseable = yes
    read only = no
    valid users = @nas

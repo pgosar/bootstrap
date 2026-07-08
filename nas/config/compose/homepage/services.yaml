@@ -1,0 +1,108 @@
+- Infrastructure:
+    - Homepage:
+        icon: homepage.png
+        href: "{{HOMEPAGE_VAR_BASE_URL}}:3000"
+        description: NAS dashboard
+        server: local-docker
+        container: homepage
+    - Docker Socket Proxy:
+        icon: docker.png
+        description: Read-only Docker API for Homepage
+        server: local-docker
+        container: dockerproxy
+
+- Documents:
+    - Komga:
+        icon: komga.png
+        href: "{{HOMEPAGE_VAR_BASE_URL}}:25600"
+        description: Comics and manga library
+        server: local-docker
+        container: komga
+
+- Media:
+    - Jellyfin:
+        icon: jellyfin.png
+        href: "{{HOMEPAGE_VAR_BASE_URL}}:8096"
+        description: Media server
+        server: local-docker
+        container: jellyfin
+    - Seerr:
+        icon: overseerr.png
+        href: "{{HOMEPAGE_VAR_BASE_URL}}:5055"
+        description: Media requests
+        server: local-docker
+        container: seerr
+    - Radarr:
+        icon: radarr.png
+        href: "{{HOMEPAGE_VAR_BASE_URL}}:7878"
+        description: Movie automation
+        server: local-docker
+        container: radarr
+    - Sonarr:
+        icon: sonarr.png
+        href: "{{HOMEPAGE_VAR_BASE_URL}}:8989"
+        description: TV automation
+        server: local-docker
+        container: sonarr
+    - Prowlarr:
+        icon: prowlarr.png
+        href: "{{HOMEPAGE_VAR_BASE_URL}}:9696"
+        description: Indexer management
+        server: local-docker
+        container: prowlarr
+    - FlareSolverr:
+        icon: flaresolverr.png
+        href: "{{HOMEPAGE_VAR_BASE_URL}}:8191"
+        description: Cloudflare challenge solver
+        server: local-docker
+        container: flaresolverr
+    - Immich:
+        icon: immich.png
+        href: "{{HOMEPAGE_VAR_BASE_URL}}:2283"
+        description: Photo library
+        server: local-docker
+        container: immich_server
+    - Tdarr:
+        icon: tdarr.png
+        href: "{{HOMEPAGE_VAR_BASE_URL}}:8265"
+        description: Media transcode orchestration
+        server: local-docker
+        container: tdarr
+
+- Downloads:
+    - qBittorrent:
+        icon: qbittorrent.png
+        href: "{{HOMEPAGE_VAR_BASE_URL}}:8080"
+        description: Torrent client via Gluetun
+        server: local-docker
+        container: qbittorrent
+    - Gluetun:
+        icon: gluetun.png
+        description: VPN network stack
+        server: local-docker
+        container: gluetun
+    - Linux ISOs:
+        icon: linux.png
+        description: Latest distro ISO mirror
+        server: local-docker
+        container: linux-iso-mirror
+    - Shelfarr:
+        icon: shelfarr.png
+        href: "{{HOMEPAGE_VAR_BASE_URL}}:5056"
+        description: Book and audiobook requests
+        server: local-docker
+        container: shelfarr
+    - Suwayomi:
+        icon: suwayomi.png
+        href: "{{HOMEPAGE_VAR_BASE_URL}}:4567"
+        description: Manga server
+        server: local-docker
+        container: suwayomi
+
+- Network:
+    - Pi-hole:
+        icon: pi-hole.png
+        href: "{{HOMEPAGE_VAR_BASE_URL}}:8081/admin"
+        description: DNS filtering
+        server: local-docker
+        container: pihole

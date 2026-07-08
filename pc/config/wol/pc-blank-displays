@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Prefer DPMS/session blanking over disabling outputs. This keeps monitor layout
+# intact and avoids fully powering displays off through DDC/CI.
+sleep "${PC_BLANK_DISPLAYS_DELAY:-30}"
+
+if command -v hyprctl >/dev/null 2>&1 && [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+  hyprctl dispatch dpms off >/dev/null 2>&1 && exit 0
+fi
+
+if command -v kscreen-doctor >/dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}" ]; then
+  kscreen-doctor --dpms off >/dev/null 2>&1 && exit 0
+fi
+
+if command -v qdbus >/dev/null 2>&1; then
+  qdbus org.freedesktop.ScreenSaver /ScreenSaver Lock >/dev/null 2>&1 || true
+fi
+
+if command -v xset >/dev/null 2>&1 && [ -n "${DISPLAY:-}" ]; then
+  xset dpms force off >/dev/null 2>&1 && exit 0
+fi
+
+exit 0

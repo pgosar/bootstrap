@@ -1,0 +1,31 @@
+services:
+  tdarr:
+    container_name: tdarr
+    image: ghcr.io/haveagitgat/tdarr:latest
+    restart: unless-stopped
+    networks:
+      - media-network
+    ports:
+      - "${LAN_IP}:8265:8265"
+      - "${LAN_IP}:8266:8266"
+    environment:
+      - TZ=America/Los_Angeles
+      - PUID=1000
+      - PGID=1001
+      - UMASK_SET=002
+      - serverIP=0.0.0.0
+      - serverPort=8266
+      - webUIPort=8265
+      - auth=true
+      - seededApiKey=${TDARR_API_KEY}
+    volumes:
+      - /data/docker/appdata/tdarr/server:/app/server
+      - /data/docker/appdata/tdarr/configs:/app/configs
+      - /data/docker/appdata/tdarr/logs:/app/logs
+      - /data/media:/media
+      - /data/torrents:/torrents
+      - /data/docker/appdata/tdarr/transcode-cache:/temp
+
+networks:
+  media-network:
+    external: true

@@ -15,6 +15,15 @@ done
 # Run diff and check for deleted files
 echo "Running snapraid diff..."
 diff_out=$(snapraid diff 2>&1 || true)
+
+if echo "$diff_out" | grep -q "WARNING! Ignoring mount point"; then
+    echo "ERROR: SnapRAID is ignoring one or more mount points."
+    echo "This usually means a data path contains Btrfs subvolumes or nested mounts"
+    echo "that SnapRAID will not protect from the parent path."
+    echo "$diff_out"
+    exit 3
+fi
+
 removed_count=$(echo "$diff_out" | awk '/^[[:space:]]*[0-9]+[[:space:]]+removed/ {print $1}')
 
 if [[ -z "$removed_count" ]]; then

@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+configured_iface="${WOL_INTERFACE:-}"
+WOL_RETRIES="${WOL_RETRIES:-30}"
+WOL_RETRY_DELAY="${WOL_RETRY_DELAY:-2}"
+
+find_interface() {
+  if [ -n "$configured_iface" ]; then
+    if [ -e "/sys/class/net/$configured_iface" ]; then
+      printf '%s\n' "$configured_iface"
+      return 0
+    fi
+    return 1
+  fi
+
+  for path in /sys/class/net/*; do
+    iface="${path##*/}"
+    case "$iface" in
+      lo|docker*|br-*|veth*|virbr*|tailscale*|wg*) continue ;;
+    esac
+    [ -e "$path/device" ] || continue
+    if command -v ethtool >/dev/null 2>&1 && ethtool "$iface" 2>/dev/null | grep -q 'Supports Wake-on:.*g'; then
+      printf '%s\n' "$iface"
+      return
+    fi
+  done
+  return 1
+}
+
+iface=""
+for _ in $(seq 1 "$WOL_RETRIES"); do
+  iface="$(find_interface || true)"
+  [ -n "${iface:-}" ] && break
+  sleep "$WOL_RETRY_DELAY"
+done
+
+if [ -z "${iface:-}" ]; then
+  echo "No WOL-capable wired interface found" >&2
+  exit 75
+fi
+
+ip link set "$iface" up || true
+ethtool -s "$iface" wol g
+ethtool "$iface" | sed -n '/Wake-on:/p'

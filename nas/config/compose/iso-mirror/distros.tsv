@@ -1,0 +1,4 @@
+# name	mode	source	output
+archlinux	direct	https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso	archlinux-latest-x86_64.iso
+debian	directory-latest	https://cdimage.debian.org/debian-cd/current/amd64/iso-dvd/	debian-latest-amd64-DVD-1.iso
+fedora-workstation	fedora-workstation	https://dl.fedoraproject.org/pub/fedora/linux/releases/	fedora-workstation-latest-x86_64.iso

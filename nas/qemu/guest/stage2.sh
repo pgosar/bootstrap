@@ -121,7 +121,6 @@ cat >"$expected_dirs" <<'EOF'
 /data/appdata-bulk
 /data/backups
 /data/docker
-/data/downloads
 /data/media
 /data/personal
 /data/replicas
@@ -130,15 +129,23 @@ cat >"$expected_dirs" <<'EOF'
 EOF
 find /data -maxdepth 1 -mindepth 1 -type d | sort >"$actual_dirs"
 diff -u "$expected_dirs" "$actual_dirs"
+
+log "torrents symlink"
+[ -L /data/torrents ] && [ "$(readlink /data/torrents)" = "media/torrents" ]
+echo "OK: /data/torrents -> media/torrents"
 rm -f "$expected_dirs" "$actual_dirs"
 
 log "per-disk btrfs subvolumes"
 for d in /mnt/disk1 /mnt/disk2 /mnt/disk3; do
   echo "== $d =="
   btrfs subvolume list "$d" | grep 'pool/'
-  for subvol in media downloads personal replicas secrets staging appdata-bulk docker backups; do
+  for subvol in media personal replicas secrets staging appdata-bulk docker backups; do
     btrfs subvolume show "$d/pool/$subvol" >/dev/null
   done
+  [ -d "$d/pool/media/torrents" ]
+  echo "OK: $d/pool/media/torrents exists"
+  [ -L "$d/pool/torrents" ] && [ "$(readlink "$d/pool/torrents")" = "media/torrents" ]
+  echo "OK: $d/pool/torrents -> media/torrents"
 done
 
 log "parity disk isolation"

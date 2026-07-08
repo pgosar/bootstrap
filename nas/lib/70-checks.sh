@@ -304,6 +304,12 @@ check_common_data_mounts() {
       check_dir_exists "$path"
       check_btrfs_subvolume "$path"
     done
+    check_dir_exists "$mountpoint/pool/media/torrents"
+    if [[ -L "$mountpoint/pool/torrents" ]] && [[ "$(readlink "$mountpoint/pool/torrents")" == "media/torrents" ]]; then
+      check_pass "$mountpoint/pool/torrents points to media/torrents"
+    else
+      check_fail "$mountpoint/pool/torrents points to media/torrents"
+    fi
   done
   check_mount_exists "$(active_mount_path "$PARITY_MOUNT")"
   check_mount_exists "$(active_mount_path "$MERGERFS_MOUNT")"
@@ -323,7 +329,8 @@ check_common_pool_dirs() {
   local path
   for path in \
     "$MERGERFS_MOUNT/media" \
-    "$MERGERFS_MOUNT/downloads" \
+    "$MERGERFS_MOUNT/torrents" \
+    "$MERGERFS_MOUNT/media/torrents" \
     "$MERGERFS_MOUNT/personal" \
     "$MERGERFS_MOUNT/replicas" \
     "$MERGERFS_MOUNT/secrets" \
@@ -335,6 +342,11 @@ check_common_pool_dirs() {
     "$DOCKER_APPDATA_DIR"; do
     check_dir_exists "$(target_path "$path")"
   done
+  if [[ "$(target_path "$MERGERFS_MOUNT/torrents")" -ef "$(target_path "$MERGERFS_MOUNT/media/torrents")" ]]; then
+    check_pass "$MERGERFS_MOUNT/torrents resolves to $MERGERFS_MOUNT/media/torrents"
+  else
+    check_fail "$MERGERFS_MOUNT/torrents resolves to $MERGERFS_MOUNT/media/torrents"
+  fi
 }
 
 check_common_fstab() {
@@ -363,7 +375,7 @@ check_common_fstab() {
 
 check_common_packages() {
   local package
-  for package in grub efibootmgr intel-ucode snapper snap-pac docker docker-compose samba btrbk yay mergerfs snapraid nftables smartmontools nvme-cli rsync restic jq curl hdparm lsscsi sg3_utils; do
+  for package in grub efibootmgr intel-ucode snapper snap-pac docker docker-compose samba btrbk yay mergerfs snapraid nftables smartmontools nvme-cli rsync restic jq curl hdparm lsscsi sg3_utils wol; do
     check_package_installed "$package"
   done
   [[ "$GRUB_BTRFS_ENABLE" == "true" ]] && check_package_installed grub-btrfs
@@ -447,7 +459,7 @@ check_common_snapraid_btrbk_samba() {
     check_path_exists "$snapraid_conf"
     check_dir_exists "$(target_path /var/lib/snapraid)"
     check_command_exists_target snapraid && check_pass "snapraid command installed" || check_fail "snapraid command installed"
-    for path in downloads staging snapshots '#recycle'; do
+    for path in torrents iso-mirror staging snapshots '#recycle'; do
       check_file_contains_literal "$snapraid_conf" "$path" "SnapRAID excludes $path"
     done
     for idx in "${!DATA_DISK_LABELS[@]}"; do
@@ -474,6 +486,21 @@ check_common_snapraid_btrbk_samba() {
       printf '%s\n' "$snapraid_output"
       check_warn "SnapRAID installed/configured, initial sync may not have been run yet"
     fi
+    if snapraid_output="$(check_run_target snapraid diff 2>&1)"; then
+      if [[ "$snapraid_output" == *"WARNING! Ignoring mount point"* ]]; then
+        printf '%s\n' "$snapraid_output"
+        check_fail "SnapRAID data entries cover Btrfs subvolume contents"
+      else
+        check_pass "SnapRAID data entries cover Btrfs subvolume contents"
+      fi
+    else
+      if [[ "$snapraid_output" == *"WARNING! Ignoring mount point"* ]]; then
+        printf '%s\n' "$snapraid_output"
+        check_fail "SnapRAID data entries cover Btrfs subvolume contents"
+      else
+        check_warn "SnapRAID diff could not be checked before initial sync"
+      fi
+    fi
     check_unit_enabled snapraid-sync.timer true
     check_unit_enabled snapraid-scrub.timer true
   fi
@@ -486,10 +513,10 @@ check_common_snapraid_btrbk_samba() {
     done
     check_file_contains_literal "$btrbk_conf" "snapshot_dir snapshots" "btrbk snapshots outside mergerfs pool"
     check_file_not_contains_literal "$btrbk_conf" "$MERGERFS_MOUNT" "btrbk does not snapshot through $MERGERFS_MOUNT"
-    if [[ -f "$btrbk_conf" ]] && grep -Eq 'subvolume[[:space:]]+pool/downloads' "$btrbk_conf"; then
-      check_fail "btrbk does not snapshot downloads"
+    if [[ -f "$btrbk_conf" ]] && grep -Eq 'subvolume[[:space:]]+pool/torrents' "$btrbk_conf"; then
+      check_fail "btrbk does not snapshot torrents"
     else
-      check_pass "btrbk does not snapshot downloads"
+      check_pass "btrbk does not snapshot torrents"
     fi
     if [[ "$TARGET_MODE" == "host" ]]; then
       btrbk -c /etc/btrbk/btrbk.conf dryrun >/dev/null 2>&1 && check_pass "btrbk config dryrun" || check_fail "btrbk config dryrun"

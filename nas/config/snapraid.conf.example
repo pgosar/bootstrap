@@ -8,14 +8,17 @@ content /mnt/disk1/snapraid.content
 content /mnt/disk2/snapraid.content
 content /mnt/disk3/snapraid.content
 
-data d1 /mnt/disk1/pool/
-data d2 /mnt/disk2/pool/
-data d3 /mnt/disk3/pool/
+data d1 /mnt/disk1/pool/media/
+data d2 /mnt/disk2/pool/media/
+data d3 /mnt/disk3/pool/media/
 
 exclude *.unrecoverable
 exclude /tmp/
 exclude /lost+found/
-exclude downloads/
+exclude torrents/
+exclude iso-mirror/
+exclude tdarr-test/
+exclude .transcode/
 exclude staging/
 exclude snapshots/
 exclude .snapshots/
@@ -26,4 +29,3 @@ exclude docker/appdata/*/transcode/
 
 # Timer sync is managed via a guarded wrapper script (/usr/local/bin/snapraid-sync.sh)
 # which refuses syncs with large delete counts (>50) unless run with --force.
-

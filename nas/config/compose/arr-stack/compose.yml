@@ -1,0 +1,191 @@
+services:
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - "${LAN_IP}:8080:8080" # qBittorrent WebUI
+      - "${LAN_IP}:4567:4567" # Suwayomi WebUI
+      - "${LAN_IP}:5056:80" # Shelfarr WebUI
+    environment:
+      - VPN_SERVICE_PROVIDER=${VPN_SERVICE_PROVIDER}
+      - VPN_PORT_FORWARDING=on
+      - VPN_PORT_FORWARDING_PROVIDER=${VPN_PORT_FORWARDING_PROVIDER}
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
+      - SERVER_COUNTRIES=United States
+      - SERVER_CITIES=
+      - TZ=America/Los_Angeles
+      - DNS_UPSTREAM_RESOLVER_TYPE=doh
+      - FIREWALL_OUTBOUND_SUBNETS=${FIREWALL_OUTBOUND_SUBNETS}
+      - HTTP_CONTROL_SERVER_ADDRESS=127.0.0.1:8000
+      - VPN_PORT_FORWARDING_UP_COMMAND=/bin/sh -c 'wget -O- -nv --retry-connrefused --post-data "json={\"listen_port\":{{PORTS}}}" http://127.0.0.1:8080/api/v2/app/setPreferences'
+    volumes:
+      - /data/docker/appdata/gluetun:/tmp/gluetun
+    networks:
+      - media-network
+    sysctls:
+      - net.ipv4.tcp_rmem=4096 131072 33554432
+      - net.ipv4.tcp_wmem=4096 16384 33554432
+    restart: unless-stopped
+    mem_limit: 768m
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1001
+      - TZ=America/Los_Angeles
+      - WEBUI_PORT=8080
+    volumes:
+      - /data/docker/appdata/qbittorrent:/config
+      - /data:/data
+    restart: unless-stopped
+    depends_on:
+      - gluetun
+    mem_limit: 2g
+
+  suwayomi:
+    image: ghcr.io/suwayomi/suwayomi-server:stable
+    container_name: suwayomi
+    network_mode: "service:gluetun"
+    environment:
+      - TZ=America/Los_Angeles
+    volumes:
+      - /data/docker/appdata/suwayomi/data:/home/suwayomi/.local/share/Tachidesk
+    restart: unless-stopped
+    depends_on:
+      - gluetun
+    mem_limit: 2g
+
+  shelfarr:
+    image: ghcr.io/pedro-revez-silva/shelfarr:latest
+    container_name: shelfarr
+    network_mode: "service:gluetun"
+    environment:
+      - TZ=America/Los_Angeles
+      - PUID=1000
+      - PGID=1001
+      - SOLID_QUEUE_IN_PUMA=1
+    volumes:
+      - /data/docker/appdata/shelfarr/data:/rails/storage
+      - /data/media/books/audiobooks:/audiobooks
+      - /data/media/books/ebooks:/ebooks
+      - /data/torrents:/downloads
+    restart: unless-stopped
+    depends_on:
+      - gluetun
+    mem_limit: 1g
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    ports:
+      - "${LAN_IP}:9696:9696"
+    environment:
+      - PUID=1000
+      - PGID=1001
+      - TZ=America/Los_Angeles
+    networks:
+      - media-network
+    volumes:
+      - /data/docker/appdata/prowlarr:/config
+    restart: unless-stopped
+    mem_limit: 256m
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    ports:
+      - "${LAN_IP}:7878:7878"
+    environment:
+      - PUID=1000
+      - PGID=1001
+      - TZ=America/Los_Angeles
+    networks:
+      - media-network
+    volumes:
+      - /data/docker/appdata/radarr:/config
+      - /data:/data
+    restart: unless-stopped
+    mem_limit: 768m
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    ports:
+      - "${LAN_IP}:8989:8989"
+    environment:
+      - PUID=1000
+      - PGID=1001
+      - TZ=America/Los_Angeles
+    networks:
+      - media-network
+    volumes:
+      - /data/docker/appdata/sonarr:/config
+      - /data:/data
+    restart: unless-stopped
+    mem_limit: 768m
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    environment:
+      - LOG_LEVEL=info
+      - LOG_HTML=false
+      - CAPTCHA_SOLVER=none
+      - TZ=America/Los_Angeles
+    ports:
+      - "${LAN_IP}:8191:8191"
+    networks:
+      - media-network
+    restart: unless-stopped
+    mem_limit: 2g
+
+  seerr:
+    image: ghcr.io/seerr-team/seerr:latest
+    container_name: seerr
+    ports:
+      - "${LAN_IP}:5055:5055"
+    environment:
+      - PUID=1000
+      - PGID=1001
+      - TZ=America/Los_Angeles
+      - FORCE_IPV4_FIRST=true
+    networks:
+      - media-network
+    volumes:
+      - /data/docker/appdata/seerr:/app/config
+    restart: unless-stopped
+    mem_limit: 512m
+
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    ports:
+      - "${LAN_IP}:8096:8096"
+    environment:
+      - PUID=1000
+      - PGID=1001
+      - TZ=America/Los_Angeles
+    group_add:
+      - "983"
+      - "987"
+    networks:
+      - media-network
+    volumes:
+      - /data/docker/appdata/jellyfin:/config
+      - /data/media:/media
+    devices:
+      - /dev/dri:/dev/dri
+    restart: unless-stopped
+    mem_limit: 2g
+
+networks:
+  media-network:
+    external: true

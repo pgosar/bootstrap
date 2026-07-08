@@ -1,0 +1,11 @@
+[Unit]
+Description=Poll Tdarr for queued work
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=15s
+Unit=tdarr-wake-monitor.service
+
+[Install]
+WantedBy=timers.target

@@ -53,12 +53,18 @@ table inet filter {
     ip protocol icmp accept
     ip6 nexthdr icmpv6 accept
     tcp dport 22 ip saddr @lan_cidrs accept
+    tcp dport 3004 ip saddr 172.16.0.0/12 accept
     tcp dport { 139, 445 } ip saddr @lan_cidrs accept
     udp dport { 137, 138 } ip saddr @lan_cidrs accept
   }
 
   chain forward {
     type filter hook forward priority 0; policy drop;
+    ct state established,related accept
+    ip saddr @lan_cidrs ip daddr 172.16.0.0/12 accept
+    ip saddr 172.16.0.0/12 accept
+    ip saddr 172.16.0.0/12 ip daddr @lan_cidrs accept
+    ip saddr 172.16.0.0/12 ip daddr 172.16.0.0/12 accept
   }
 
   chain output {
