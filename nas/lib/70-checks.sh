@@ -367,10 +367,14 @@ check_common_packages() {
     check_package_installed "$package"
   done
   [[ "$GRUB_BTRFS_ENABLE" == "true" ]] && check_package_installed grub-btrfs
-  if check_run_target pacman -Q ufw >/dev/null 2>&1; then
-    check_fail "ufw package is not installed on NAS"
+  if [[ "$ENABLE_UFW" == "true" ]]; then
+    check_package_installed ufw
   else
-    check_pass "ufw package is not installed on NAS"
+    if check_run_target pacman -Q ufw >/dev/null 2>&1; then
+      check_fail "ufw package is not installed on NAS"
+    else
+      check_pass "ufw package is not installed on NAS"
+    fi
   fi
 }
 
@@ -526,6 +530,13 @@ check_common_services() {
   check_unit_enabled systemd-timesyncd.service true
   if [[ "$TARGET_MODE" == "host" ]]; then
     check_unit_active systemd-timesyncd.service true
+  fi
+  if [[ "$ENABLE_UFW" == "true" ]]; then
+    check_unit_enabled ufw.service true
+    if [[ "$TARGET_MODE" == "host" ]]; then
+      check_unit_not_failed ufw.service
+      check_unit_active ufw.service true
+    fi
   fi
   if [[ "$FIREWALL_ENABLE" == "true" ]]; then
     check_path_exists "$(target_path /etc/nftables.conf)"

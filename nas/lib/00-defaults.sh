@@ -33,6 +33,7 @@ PACMAN_PACKAGES=(
   tailscale
   samba
   nftables
+  ufw
   btrbk
   restic
   age
@@ -135,6 +136,7 @@ ALLOW_QEMU_DEVICE_NAMES="false"
 DISK_LAYOUT_REVIEWED="false"
 VALIDATE_WRITE_TESTS="false"
 FIREWALL_ENABLE="true"
+ENABLE_UFW="true"
 FIREWALL_LAN_CIDRS="192.168.0.0/16 10.0.0.0/8 172.16.0.0/12 100.64.0.0/10"
 SMART_ENABLE="true"
 JOURNALD_SYSTEM_MAX_USE="1G"
