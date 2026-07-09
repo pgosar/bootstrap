@@ -600,6 +600,13 @@ check_common_services() {
   check_file_contains_literal "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)" "SystemMaxUse=$JOURNALD_SYSTEM_MAX_USE" "journald SystemMaxUse configured"
   check_file_contains_literal "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)" "RuntimeMaxUse=$JOURNALD_RUNTIME_MAX_USE" "journald RuntimeMaxUse configured"
   check_file_contains_literal "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)" "MaxRetentionSec=$JOURNALD_MAX_RETENTION_SEC" "journald MaxRetentionSec configured"
+  if [[ "$SWAP_ENABLE" == "true" ]]; then
+    check_path_exists "$(target_path "$SWAP_FILE")"
+    check_file_contains_literal "$(target_path /etc/fstab)" "$SWAP_FILE none swap defaults 0 0" "swapfile is persistent in fstab"
+    if [[ "$TARGET_MODE" == "host" ]]; then
+      swapon --show=NAME --noheadings | grep -Fxq "$SWAP_FILE" && check_pass "$SWAP_FILE is active" || check_fail "$SWAP_FILE is active"
+    fi
+  fi
   check_path_exists "$(target_path /usr/local/sbin/nas-notify)"
   if [[ -x "$(target_path /usr/local/sbin/nas-notify)" ]]; then
     check_pass "nas-notify helper is executable"

@@ -16,6 +16,44 @@ configure_operations_basics() {
   run chmod 0755 "$(target_path /usr/local/sbin/nas-notify)"
 }
 
+configure_swap() {
+  log "Phase: OS swapfile"
+  if [[ "$SWAP_ENABLE" != "true" ]]; then
+    warn "SWAP_ENABLE is false; skipping swapfile setup."
+    return 0
+  fi
+  [[ "$SWAP_FILE" == /* ]] || die "SWAP_FILE must be an absolute path"
+  [[ "$SWAP_SIZE" =~ ^[0-9]+[KkMmGgTt]?$ ]] || die "SWAP_SIZE must look like 12g"
+
+  local swap_path fstab line
+  swap_path="$(target_path "$SWAP_FILE")"
+  fstab="$(target_path /etc/fstab)"
+  line="$SWAP_FILE none swap defaults 0 0"
+
+  if [[ "$APPLY" == true ]]; then
+    ensure_dir "$(dirname -- "$swap_path")"
+    if [[ ! -e "$swap_path" ]]; then
+      target_run btrfs filesystem mkswapfile --size "$SWAP_SIZE" "$SWAP_FILE"
+    fi
+    run chmod 0600 "$swap_path"
+    if [[ "$TARGET_MODE" == "host" ]] && ! swapon --show=NAME --noheadings | grep -Fxq "$SWAP_FILE"; then
+      target_run swapon "$SWAP_FILE"
+    fi
+  else
+    log "+ btrfs filesystem mkswapfile --size $(printf '%q' "$SWAP_SIZE") $(printf '%q' "$SWAP_FILE")"
+    log "+ swapon $(printf '%q' "$SWAP_FILE")"
+  fi
+
+  backup_file "$fstab"
+  if [[ "$APPLY" == true ]] && grep -Fxq "$line" "$fstab"; then
+    log "+ fstab already contains $SWAP_FILE swap entry"
+  elif [[ "$APPLY" == true ]]; then
+    printf '\n# NAS bootstrap swapfile on NVMe root filesystem\n%s\n' "$line" >>"$fstab"
+  else
+    log "+ append swap entry to $fstab: $line"
+  fi
+}
+
 configure_firewall() {
   log "Phase: nftables firewall"
   if [[ "$FIREWALL_ENABLE" != "true" ]]; then
@@ -172,6 +210,7 @@ configure_tailscale() {
 
 configure_services() {
   configure_operations_basics
+  configure_swap
   configure_firewall
   configure_smartd
   configure_snapraid
