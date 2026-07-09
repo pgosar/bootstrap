@@ -449,6 +449,23 @@ check_common_docker() {
   fi
 }
 
+check_common_pc_worker_orchestration() {
+  [[ "$PC_WORKER_ORCHESTRATION_ENABLE" == "true" ]] || return 0
+
+  check_path_exists "$(target_path /etc/systemd/system/immich-ml-wake-proxy.service)"
+  check_path_exists "$(target_path /etc/systemd/system/tdarr-wake-monitor.service)"
+  check_path_exists "$(target_path /etc/systemd/system/tdarr-wake-monitor.timer)"
+  check_path_exists "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/immich-ml-wake-proxy.py"
+  check_path_exists "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/tdarr-wake-monitor.sh"
+  check_path_exists "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/pc-worker-ensure.sh"
+  check_unit_enabled immich-ml-wake-proxy.service true
+  check_unit_enabled tdarr-wake-monitor.timer true
+  if [[ "$TARGET_MODE" == "host" ]]; then
+    check_unit_active immich-ml-wake-proxy.service true
+    check_unit_active tdarr-wake-monitor.timer true
+  fi
+}
+
 check_common_snapraid_btrbk_samba() {
   local snapraid_conf btrbk_conf samba_conf idx mountpoint snapraid_output snapraid_status
   snapraid_conf="$(target_path /etc/snapraid.conf)"
@@ -663,6 +680,7 @@ check_live_target() {
   check_common_packages
   check_common_grub_snapper
   check_common_docker
+  check_common_pc_worker_orchestration
   check_common_snapraid_btrbk_samba
   check_common_services
   print_check_summary
@@ -699,6 +717,7 @@ check_health() {
   check_common_packages
   check_common_grub_snapper
   check_common_docker
+  check_common_pc_worker_orchestration
   check_common_snapraid_btrbk_samba
   check_common_services
   print_check_summary

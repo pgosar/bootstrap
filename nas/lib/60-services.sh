@@ -192,6 +192,19 @@ configure_docker() {
   copy_with_backup "$NAS_ROOT/config/docker-daemon.json.example" "$(target_path /etc/docker/daemon.json)"
 }
 
+configure_pc_worker_orchestration() {
+  log "Phase: PC worker orchestration units"
+  if [[ "$PC_WORKER_ORCHESTRATION_ENABLE" != "true" ]]; then
+    warn "PC_WORKER_ORCHESTRATION_ENABLE is false; skipping PC worker orchestration units."
+    return 0
+  fi
+
+  local unit
+  for unit in immich-ml-wake-proxy.service tdarr-wake-monitor.service tdarr-wake-monitor.timer; do
+    copy_with_backup "$NAS_ROOT/config/systemd/$unit" "$(target_path "/etc/systemd/system/$unit")"
+  done
+}
+
 configure_samba() {
   log "Phase: Samba config"
   copy_with_backup "$NAS_ROOT/config/smb.conf.example" "$(target_path /etc/samba/smb.conf)"
@@ -216,6 +229,7 @@ configure_services() {
   configure_snapraid
   configure_btrbk
   configure_docker
+  configure_pc_worker_orchestration
   configure_samba
   configure_tailscale
 }
@@ -254,6 +268,12 @@ enable_services() {
     target_run systemctl enable docker
     if [[ "$START_SERVICES" == true && "$TARGET_MODE" == "host" ]]; then
       target_run systemctl start docker
+    fi
+  fi
+  if [[ "$PC_WORKER_ORCHESTRATION_ENABLE" == "true" ]]; then
+    target_run systemctl enable immich-ml-wake-proxy.service tdarr-wake-monitor.timer
+    if [[ "$START_SERVICES" == true && "$TARGET_MODE" == "host" ]]; then
+      target_run systemctl start immich-ml-wake-proxy.service tdarr-wake-monitor.timer
     fi
   fi
   if [[ "$TAILSCALE_ENABLE" == "true" ]]; then
