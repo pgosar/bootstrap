@@ -123,6 +123,7 @@ cliphist
 wl-clipboard
 yazi
 firefox
+nextcloud-client
 pipewire
 pipewire-alsa
 pipewire-jack
