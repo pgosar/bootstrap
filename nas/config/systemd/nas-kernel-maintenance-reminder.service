@@ -1,0 +1,8 @@
+[Unit]
+Description=Send semiannual NAS kernel maintenance reminder
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nas-kernel-maintenance-reminder

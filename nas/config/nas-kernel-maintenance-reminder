@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+running_kernel="$(uname -r 2>/dev/null || printf unknown)"
+installed_linux="$(pacman -Q linux 2>/dev/null | awk '{print $2}')"
+installed_release="${installed_linux/.arch/-arch}"
+
+message="Semiannual NAS kernel maintenance reminder. Running kernel: $running_kernel; installed linux package: ${installed_linux:-unknown}. Review updates, run the intentional kernel upgrade workflow, reboot, and verify storage plus services."
+if [[ -n "$installed_release" && "$installed_release" != "$running_kernel" ]]; then
+  message+=" A reboot is already pending because the installed kernel differs from the running kernel."
+fi
+
+exec /usr/local/sbin/nas-notify kernel-maintenance "$message"

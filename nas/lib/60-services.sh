@@ -8,6 +8,10 @@ configure_operations_basics() {
   run chown root:root "$(target_path /var/lib/nas-secrets/locked)"
   run chmod 0555 "$(target_path /var/lib/nas-secrets/locked)"
   copy_with_backup "$NAS_ROOT/config/profile.d/nas-kernel-reminder.sh" "$(target_path /etc/profile.d/nas-kernel-reminder.sh)"
+  copy_with_backup "$NAS_ROOT/config/nas-kernel-maintenance-reminder" "$(target_path /usr/local/sbin/nas-kernel-maintenance-reminder)"
+  run chmod 0755 "$(target_path /usr/local/sbin/nas-kernel-maintenance-reminder)"
+  copy_with_backup "$NAS_ROOT/config/systemd/nas-kernel-maintenance-reminder.service" "$(target_path /etc/systemd/system/nas-kernel-maintenance-reminder.service)"
+  copy_with_backup "$NAS_ROOT/config/systemd/nas-kernel-maintenance-reminder.timer" "$(target_path /etc/systemd/system/nas-kernel-maintenance-reminder.timer)"
   copy_with_backup "$NAS_ROOT/config/zsh/zshrc" "$(target_path /etc/zsh/zshrc)"
   backup_file "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)"
   write_text "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)" \
@@ -264,6 +268,7 @@ enable_services() {
   fi
 
   target_run systemctl enable systemd-timesyncd.service
+  target_run systemctl enable nas-kernel-maintenance-reminder.timer
   if [[ "$START_SERVICES" == true && "$TARGET_MODE" == "host" ]]; then
     target_run systemctl start systemd-timesyncd.service
   fi

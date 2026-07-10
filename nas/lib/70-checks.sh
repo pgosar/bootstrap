@@ -642,6 +642,11 @@ check_common_services() {
   check_file_contains_literal "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)" "MaxRetentionSec=$JOURNALD_MAX_RETENTION_SEC" "journald MaxRetentionSec configured"
   check_path_exists "$(target_path /etc/profile.d/nas-kernel-reminder.sh)"
   check_file_contains_literal "$(target_path /etc/profile.d/nas-kernel-reminder.sh)" "IgnorePkg includes linux/linux-headers" "kernel reminder documents pacman pin"
+  check_path_exists "$(target_path /usr/local/sbin/nas-kernel-maintenance-reminder)"
+  check_path_exists "$(target_path /etc/systemd/system/nas-kernel-maintenance-reminder.service)"
+  check_path_exists "$(target_path /etc/systemd/system/nas-kernel-maintenance-reminder.timer)"
+  check_file_contains_literal "$(target_path /etc/systemd/system/nas-kernel-maintenance-reminder.timer)" "OnCalendar=*-01,07-01 09:00:00" "kernel maintenance reminder runs every six months"
+  check_unit_enabled nas-kernel-maintenance-reminder.timer true
   check_path_exists "$(target_path /etc/zsh/zshrc)"
   check_file_contains_literal "$(target_path /etc/zsh/zshrc)" "nas-kernel-reminder.sh" "zsh interactive shells source kernel reminder"
   if [[ "$SWAP_ENABLE" == "true" ]]; then
