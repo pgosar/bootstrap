@@ -6,6 +6,8 @@ readonly REPORT_DIR="${NAS_WEEKLY_DIGEST_REPORT_DIR:-$STATE_DIR/reports}"
 readonly LOCK_FILE="${NAS_WEEKLY_DIGEST_LOCK_FILE:-/run/lock/nas-weekly-digest.lock}"
 readonly LARGE_BYTES="${NAS_WEEKLY_DIGEST_LARGE_BYTES:-1073741824}"
 readonly MAX_ITEMS="${NAS_WEEKLY_DIGEST_MAX_ITEMS:-8}"
+readonly MERGERFS_MIN_FREE_BYTES="${NAS_WEEKLY_DIGEST_MIN_FREE_BYTES:-107374182400}"
+readonly DISK_IMBALANCE_BYTES="${NAS_WEEKLY_DIGEST_IMBALANCE_BYTES:-107374182400}"
 readonly PHOTO_ROOTS="${NAS_WEEKLY_DIGEST_PHOTO_ROOTS:-/data/photos /data/personal/Photos}"
 readonly INBOX_ROOTS="${NAS_WEEKLY_DIGEST_INBOX_ROOTS:-/data/inbox /data/staging}"
 readonly SNAPRAID_POOL_ROOTS="${NAS_WEEKLY_DIGEST_SNAPRAID_POOL_ROOTS:-/mnt/disk1/pool/media /mnt/disk2/pool/media /mnt/disk3/pool/media}"
@@ -146,6 +148,13 @@ btrfs_usage_line() {
   printf '%s: %s\n' "$path" "${usage:-unavailable}"
 }
 
+disk_health_line() {
+  local path="$1" used free
+  used="$(btrfs filesystem usage -b "$path" 2>/dev/null | awk '/^    Used:/ {print $2; exit}' || true)"
+  free="$(df -B1 --output=avail "$path" 2>/dev/null | awk 'NR == 2 {print $1}' || true)"
+  printf '%s\t%s\t%s\n' "$path" "${used:-0}" "${free:-0}"
+}
+
 photos_manifest="$tmp_dir/photos.manifest"
 inbox_manifest="$tmp_dir/inbox.manifest"
 appdata_manifest="$tmp_dir/appdata.manifest"
@@ -170,6 +179,30 @@ format_manifest_paths "$inbox_new" "$inbox_manifest" "$inbox_items"
 format_manifest_paths "$appdata_changed" "$appdata_manifest" "$appdata_items"
 large_new_files "$photos_manifest" "$photos_new" "$large_items"
 populated_excluded_dirs "$excluded_dirs"
+
+disk_health="$tmp_dir/disk.health"
+: >"$disk_health"
+for disk in /mnt/disk1 /mnt/disk2 /mnt/disk3; do
+  disk_health_line "$disk" >>"$disk_health"
+done
+disk_low_free="$tmp_dir/disk.low-free"
+awk -F '\t' -v minimum="$MERGERFS_MIN_FREE_BYTES" '$3 < minimum {printf "%s free=%.1f GiB\n", $1, $3 / 1073741824}' "$disk_health" >"$disk_low_free"
+disk_low_free_count="$(wc -l <"$disk_low_free")"
+disk_imbalance_bytes="$(awk -F '\t' '
+  NR == 1 {min = max = $2; next}
+  {if ($2 < min) min = $2; if ($2 > max) max = $2}
+  END {if (NR > 0) print max - min; else print 0}
+' "$disk_health")"
+disk_imbalance_gib="$(awk -v bytes="$disk_imbalance_bytes" 'BEGIN {printf "%.1f", bytes / 1073741824}')"
+disk_imbalance_alert=0
+[ "$disk_imbalance_bytes" -gt "$DISK_IMBALANCE_BYTES" ] && disk_imbalance_alert=1
+btrfs_scrub_status="$tmp_dir/btrfs.scrub"
+: >"$btrfs_scrub_status"
+for disk in /mnt/disk1 /mnt/disk2 /mnt/disk3; do
+  scrub_summary="$(btrfs scrub status "$disk" 2>/dev/null | awk '/Error summary:/ {line=$0; sub(/^[[:space:]]+/, "", line); gsub(/[[:space:]]+/, " ", line); print line; found=1} END {if (!found) print "status unavailable"}' || true)"
+  printf '%s\t%s\n' "$disk" "$scrub_summary" >>"$btrfs_scrub_status"
+done
+btrfs_scrub_error_count="$(awk -F '\t' '$2 != "Error summary: no errors found" {count++} END {print count + 0}' "$btrfs_scrub_status")"
 
 photos_count="$(wc -l <"$photos_new")"
 inbox_count="$(wc -l <"$inbox_new")"
@@ -235,6 +268,11 @@ report="$REPORT_DIR/$(date +%Y-%m-%d).txt"
   btrfs_usage_line /mnt/disk2
   btrfs_usage_line /mnt/disk3
   storage_line /mnt/parity
+  printf 'MergerFS minimum-free checks (100 GiB): %s disk(s) below threshold\n' "$disk_low_free_count"
+  sed -n '1,8p' "$disk_low_free"
+  printf 'Btrfs used-space imbalance across data disks: %s GiB (alert threshold: %.1f GiB)\n' "$disk_imbalance_gib" "$(awk -v bytes="$DISK_IMBALANCE_BYTES" 'BEGIN {printf "%.1f", bytes / 1073741824}')"
+  printf 'Btrfs scrub status:\n'
+  awk -F '\t' '{print "- " $1 ": " $2}' "$btrfs_scrub_status"
   printf '\nChanges:\n'
   printf 'New photo files: %s\n' "$photos_count"
   sed -n '1,8p' "$photos_items"
@@ -290,12 +328,15 @@ critical_alerts="$tmp_dir/critical.alerts"
 [ "$docker_log_error_count" -gt 0 ] && printf 'DOCKER LOGS: %s error-like line(s) across running containers\n' "$docker_log_error_count" >>"$critical_alerts"
 [ "$oom_count" -gt 0 ] && printf 'KERNEL: %s OOM/killed-process line(s)\n' "$oom_count" >>"$critical_alerts"
 [ "$failed_unit_count" -gt 0 ] && printf 'SYSTEMD: %s unit(s) currently failed\n' "$failed_unit_count" >>"$critical_alerts"
+[ "$disk_low_free_count" -gt 0 ] && printf 'STORAGE: %s disk(s) below the 100 GiB mergerfs minimum-free threshold\n' "$disk_low_free_count" >>"$critical_alerts"
+[ "$disk_imbalance_alert" -eq 1 ] && printf 'STORAGE: data-disk used-space imbalance is %s GiB\n' "$disk_imbalance_gib" >>"$critical_alerts"
+[ "$btrfs_scrub_error_count" -gt 0 ] && printf 'BTRFS: scrub status needs attention on %s disk(s)\n' "$btrfs_scrub_error_count" >>"$critical_alerts"
 critical_count="$(wc -l <"$critical_alerts")"
 
 summary="$(cat <<EOF
 📊 NAS WEEKLY DIGEST ($(date +%Y-%m-%d))
 Changes: photos +$photos_count | intake +$inbox_count (pending $pending_count) | appdata changed $appdata_count | large photos $large_count
-Health: Docker not-Up $docker_bad_count | Docker log errors $docker_log_error_count | journal priority 0-3 $journal_error_count
+Health: Docker not-Up $docker_bad_count | Docker log errors $docker_log_error_count | journal priority 0-3 $journal_error_count | disk imbalance ${disk_imbalance_gib} GiB
 Protection: SnapRAID exclusions with files $excluded_count | secrets $secrets_state
 Storage: Btrfs usage and parity capacity are in the local report
 Full report: $report
