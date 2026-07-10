@@ -1,0 +1,11 @@
+[Unit]
+Description=Monthly Btrfs scrub for disk1
+
+[Timer]
+Unit=nas-btrfs-scrub@disk1.service
+OnCalendar=Tue *-*-01..07 03:30:00
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Non-repairing Btrfs scrub for %i
+Documentation=man:btrfs-scrub(8)
+RequiresMountsFor=/mnt/%i
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/nas-btrfs-scrub %i
+Nice=19
+IOSchedulingClass=idle

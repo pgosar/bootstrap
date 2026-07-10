@@ -675,9 +675,16 @@ check_common_services() {
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-weekly-digest)" "NAS_WEEKLY_DIGEST_LARGE_BYTES" "weekly digest tracks large files"
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-weekly-digest)" "snapraid-sync.service" "weekly digest reports parity status"
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-weekly-digest)" "btrfs filesystem usage" "weekly digest reports Btrfs usage"
+  check_file_contains_literal "$(target_path /usr/local/sbin/nas-weekly-digest)" "MERGERFS_MIN_FREE_BYTES" "weekly digest checks mergerfs minimum free space"
+  check_file_contains_literal "$(target_path /usr/local/sbin/nas-weekly-digest)" "btrfs scrub status" "weekly digest reports Btrfs scrub status"
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-weekly-digest)" "docker logs" "weekly digest scans Docker logs"
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-weekly-digest)" "CRITICAL NAS ALERTS" "weekly digest emphasizes critical alerts"
   check_unit_enabled nas-weekly-digest.timer true
+  check_path_exists "$(target_path /usr/local/bin/nas-btrfs-scrub)"
+  check_path_exists "$(target_path /etc/systemd/system/nas-btrfs-scrub@.service)"
+  check_unit_enabled nas-btrfs-scrub-disk1.timer true
+  check_unit_enabled nas-btrfs-scrub-disk2.timer true
+  check_unit_enabled nas-btrfs-scrub-disk3.timer true
   check_path_exists "$(target_path /etc/nas-notify.env.example)"
   if [[ -f "$(target_path /etc/nas-notify.env)" ]]; then
     check_pass "/etc/nas-notify.env exists"
