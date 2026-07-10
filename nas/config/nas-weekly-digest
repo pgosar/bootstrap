@@ -190,7 +190,7 @@ docker_log_errors="$tmp_dir/docker.log.errors"
 : >"$docker_log_errors"
 while IFS= read -r container; do
   [ -n "$container" ] || continue
-  log_count="$(docker logs --since 7d --tail 500 "$container" 2>&1 |
+  log_count="$(docker logs --since 168h --tail 500 "$container" 2>&1 |
     grep -Eic 'error|fatal|panic|critical|oom|out of memory|traceback|failed' || true)"
   [ "$log_count" -gt 0 ] && printf '%s\t%s\n' "$log_count" "$container" >>"$docker_log_errors"
 done < <(docker ps --format '{{.Names}}' 2>/dev/null)
