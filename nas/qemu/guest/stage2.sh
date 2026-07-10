@@ -68,11 +68,13 @@ run_check findmnt -n -o SOURCE,FSTYPE,OPTIONS /home
 run_check findmnt -n -o SOURCE,FSTYPE,OPTIONS /var/log
 run_check findmnt -n -o SOURCE,FSTYPE,OPTIONS /var/cache/pacman/pkg
 run_check findmnt -n -o SOURCE,FSTYPE,OPTIONS /.snapshots
+run_check findmnt -n -o SOURCE,FSTYPE,OPTIONS /swap
 run_shell_check "findmnt -n -o OPTIONS / | grep -Eq 'subvol=/?@([,]|$)'"
 run_shell_check "findmnt -n -o OPTIONS /home | grep -Eq 'subvol=/?@home([,]|$)'"
 run_shell_check "findmnt -n -o OPTIONS /var/log | grep -Eq 'subvol=/?@log([,]|$)'"
 run_shell_check "findmnt -n -o OPTIONS /var/cache/pacman/pkg | grep -Eq 'subvol=/?@pkg([,]|$)'"
 run_shell_check "findmnt -n -o OPTIONS /.snapshots | grep -Eq 'subvol=/?@snapshots([,]|$)'"
+run_shell_check "findmnt -n -o OPTIONS /swap | grep -Eq 'subvol=/?@swap([,]|$)'"
 
 log "fstab mergerfs correctness after reboot"
 run_check cat /etc/fstab

@@ -140,10 +140,12 @@ raw_rejected_env="/root/qemu-nas-raw-rejected.env"
   log "active mergerfs mounts before reboot"
   run_check findmnt /mnt/data
   run_check findmnt /mnt/mnt/snapshots
+  run_check findmnt /mnt/swap
   run_check findmnt -n -o FSTYPE,OPTIONS /mnt/data
   run_check findmnt -n -o FSTYPE,OPTIONS /mnt/mnt/snapshots
   run_shell_check "findmnt -n -o OPTIONS /mnt/data | tr ',' '\n' | (! grep -qx ro)"
   run_shell_check "findmnt -n -o OPTIONS /mnt/mnt/snapshots | tr ',' '\n' | grep -qx ro"
+  run_shell_check "findmnt -n -o OPTIONS /mnt/swap | grep -Eq 'subvol=/?@swap([,]|$)'"
 
   log "write behavior before reboot"
   run_shell_check "touch /mnt/data/.nas-bootstrap-qemu-write-test && test -f /mnt/data/.nas-bootstrap-qemu-write-test && rm -f /mnt/data/.nas-bootstrap-qemu-write-test"

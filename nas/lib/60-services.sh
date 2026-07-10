@@ -21,7 +21,9 @@ configure_swap() {
     warn "SWAP_ENABLE is false; skipping swapfile setup."
     return 0
   fi
+  [[ "$SWAP_MOUNT" == /* ]] || die "SWAP_MOUNT must be an absolute path"
   [[ "$SWAP_FILE" == /* ]] || die "SWAP_FILE must be an absolute path"
+  [[ "$(dirname -- "$SWAP_FILE")" == "$SWAP_MOUNT" ]] || die "SWAP_FILE must live directly under SWAP_MOUNT"
   [[ "$SWAP_SIZE" =~ ^[0-9]+[KkMmGgTt]?$ ]] || die "SWAP_SIZE must look like 12g"
 
   local swap_path fstab line
@@ -30,7 +32,10 @@ configure_swap() {
   line="$SWAP_FILE none swap defaults 0 0"
 
   if [[ "$APPLY" == true ]]; then
-    ensure_dir "$(dirname -- "$swap_path")"
+    ensure_dir "$(target_path "$SWAP_MOUNT")"
+    if ! findmnt -rn --mountpoint "$(target_path "$SWAP_MOUNT")" >/dev/null 2>&1; then
+      die "$SWAP_MOUNT must be mounted from the dedicated @swap subvolume before creating swap"
+    fi
     if [[ ! -e "$swap_path" ]]; then
       target_run btrfs filesystem mkswapfile --size "$SWAP_SIZE" "$SWAP_FILE"
     fi
