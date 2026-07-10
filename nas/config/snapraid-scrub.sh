@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
+LOCK_FILE=/run/lock/snapraid-operation.lock
+
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  printf 'Another SnapRAID operation is active; skipping this scrub.\n' >&2
+  /usr/local/sbin/nas-notify snapraid-scrub \
+    "Scrub skipped because another SnapRAID operation holds $LOCK_FILE." || true
+  exit 0
+fi
+
 output_file="$(mktemp)"
 trap 'rm -f "$output_file"' EXIT
 

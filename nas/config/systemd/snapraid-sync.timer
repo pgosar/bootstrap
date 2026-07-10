@@ -2,10 +2,12 @@
 Description=Run SnapRAID sync about every 12 hours
 
 [Timer]
-OnCalendar=*-*-* 03,15:15:00
-RandomizedDelaySec=45m
+# Keep overnight sync ahead of the 03:17 ISO check and 04:00 PC-worker window.
+# Sunday morning is reserved for scrub; the afternoon sync still runs daily.
+OnCalendar=Mon..Sat *-*-* 02:15:00
+OnCalendar=*-*-* 15:15:00
+RandomizedDelaySec=30m
 Persistent=true
 
 [Install]
 WantedBy=timers.target
-

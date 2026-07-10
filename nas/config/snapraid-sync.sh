@@ -4,6 +4,15 @@ set -euo pipefail
 
 THRESHOLD=50
 FORCE=false
+LOCK_FILE=/run/lock/snapraid-operation.lock
+
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "Another SnapRAID operation is active; skipping this sync."
+    /usr/local/sbin/nas-notify snapraid-sync \
+        "Sync skipped because another SnapRAID operation holds $LOCK_FILE." || true
+    exit 0
+fi
 
 # Check for force flag
 for arg in "$@"; do
