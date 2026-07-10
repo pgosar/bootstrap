@@ -669,6 +669,12 @@ check_common_services() {
     check_fail "nas-notify helper is executable"
   fi
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-notify)" "NAS_NOTIFY_DISCORD_WEBHOOK_URL" "nas-notify has Discord delivery configured"
+  check_path_exists "$(target_path /usr/local/sbin/nas-weekly-digest)"
+  check_path_exists "$(target_path /etc/systemd/system/nas-weekly-digest.service)"
+  check_path_exists "$(target_path /etc/systemd/system/nas-weekly-digest.timer)"
+  check_file_contains_literal "$(target_path /usr/local/sbin/nas-weekly-digest)" "NAS_WEEKLY_DIGEST_LARGE_BYTES" "weekly digest tracks large files"
+  check_file_contains_literal "$(target_path /usr/local/sbin/nas-weekly-digest)" "snapraid-sync.service" "weekly digest reports parity status"
+  check_unit_enabled nas-weekly-digest.timer true
   check_path_exists "$(target_path /etc/nas-notify.env.example)"
   if [[ -f "$(target_path /etc/nas-notify.env)" ]]; then
     check_pass "/etc/nas-notify.env exists"

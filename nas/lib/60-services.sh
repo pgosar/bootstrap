@@ -18,6 +18,10 @@ configure_operations_basics() {
     "[Journal]"$'\n'"SystemMaxUse=$JOURNALD_SYSTEM_MAX_USE"$'\n'"RuntimeMaxUse=$JOURNALD_RUNTIME_MAX_USE"$'\n'"MaxRetentionSec=$JOURNALD_MAX_RETENTION_SEC"$'\n'
   copy_with_backup "$NAS_ROOT/config/nas-notify" "$(target_path /usr/local/sbin/nas-notify)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-notify)"
+  copy_with_backup "$NAS_ROOT/config/nas-weekly-digest" "$(target_path /usr/local/sbin/nas-weekly-digest)"
+  run chmod 0755 "$(target_path /usr/local/sbin/nas-weekly-digest)"
+  copy_with_backup "$NAS_ROOT/config/systemd/nas-weekly-digest.service" "$(target_path /etc/systemd/system/nas-weekly-digest.service)"
+  copy_with_backup "$NAS_ROOT/config/systemd/nas-weekly-digest.timer" "$(target_path /etc/systemd/system/nas-weekly-digest.timer)"
   copy_with_backup "$NAS_ROOT/config/nas-secrets" "$(target_path /usr/local/bin/nas-secrets)"
   run chmod 0755 "$(target_path /usr/local/bin/nas-secrets)"
   copy_with_backup "$NAS_ROOT/config/nas-notify.env.example" "$(target_path /etc/nas-notify.env.example)"
@@ -269,6 +273,7 @@ enable_services() {
 
   target_run systemctl enable systemd-timesyncd.service
   target_run systemctl enable nas-kernel-maintenance-reminder.timer
+  target_run systemctl enable nas-weekly-digest.timer
   if [[ "$START_SERVICES" == true && "$TARGET_MODE" == "host" ]]; then
     target_run systemctl start systemd-timesyncd.service
   fi

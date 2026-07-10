@@ -1,0 +1,11 @@
+[Unit]
+Description=Send the weekly NAS digest
+
+[Timer]
+OnCalendar=Sun 09:00
+RandomizedDelaySec=15m
+Persistent=true
+Unit=nas-weekly-digest.service
+
+[Install]
+WantedBy=timers.target
