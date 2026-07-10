@@ -120,7 +120,10 @@ main() {
     check_health
     return 0
   fi
-  [[ "$INSTALL_ARCH" == true ]] && install_arch_system
+  if [[ "$INSTALL_ARCH" == true ]]; then
+    install_arch_system
+    configure_pacman_ignore_packages
+  fi
   if [[ "$PACKAGES" == true ]]; then
     install_packages
     configure_users

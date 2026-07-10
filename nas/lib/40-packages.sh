@@ -21,10 +21,54 @@ check_pacman_packages_available() {
   done
 }
 
+configure_pacman_ignore_packages() {
+  local active_conf existing_line package existing found line
+  local -a merged=()
+
+  [[ "${#PACMAN_IGNORE_PACKAGES[@]}" -gt 0 ]] || return 0
+
+  active_conf="$(target_path /etc/pacman.conf)"
+  line="IgnorePkg   = ${PACMAN_IGNORE_PACKAGES[*]}"
+  log "Phase: configure pacman ignored packages"
+
+  if [[ "$APPLY" != true ]]; then
+    log "Would ensure $active_conf contains: $line"
+    return 0
+  fi
+
+  [[ -f "$active_conf" ]] || die "pacman config not found: $active_conf"
+
+  existing_line="$(grep -E '^[[:space:]]*IgnorePkg[[:space:]]*=' "$active_conf" | head -n1 || true)"
+  if [[ -n "$existing_line" ]]; then
+    read -r -a merged <<<"${existing_line#*=}"
+  fi
+
+  for package in "${PACMAN_IGNORE_PACKAGES[@]}"; do
+    found=false
+    for existing in "${merged[@]}"; do
+      if [[ "$existing" == "$package" ]]; then
+        found=true
+        break
+      fi
+    done
+    [[ "$found" == true ]] || merged+=("$package")
+  done
+
+  line="IgnorePkg   = ${merged[*]}"
+  if [[ -n "$existing_line" ]]; then
+    sed -i -E "0,/^[[:space:]]*IgnorePkg[[:space:]]*=.*/s//${line}/" "$active_conf"
+  elif grep -qE '^[[:space:]]*#IgnorePkg[[:space:]]*=' "$active_conf"; then
+    sed -i -E "0,/^[[:space:]]*#IgnorePkg[[:space:]]*=.*/s//${line}/" "$active_conf"
+  else
+    printf '\n%s\n' "$line" >>"$active_conf"
+  fi
+}
+
 install_packages() {
   log "Phase: install official pacman packages"
   log "Package list:"
   printf '  %s\n' "${PACMAN_PACKAGES[@]}"
+  configure_pacman_ignore_packages
   if [[ "$APPLY" == true ]]; then
     ensure_target_resolver
     check_pacman_packages_available "${PACMAN_PACKAGES[@]}"
