@@ -617,6 +617,10 @@ check_common_services() {
   check_file_contains_literal "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)" "SystemMaxUse=$JOURNALD_SYSTEM_MAX_USE" "journald SystemMaxUse configured"
   check_file_contains_literal "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)" "RuntimeMaxUse=$JOURNALD_RUNTIME_MAX_USE" "journald RuntimeMaxUse configured"
   check_file_contains_literal "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)" "MaxRetentionSec=$JOURNALD_MAX_RETENTION_SEC" "journald MaxRetentionSec configured"
+  check_path_exists "$(target_path /etc/profile.d/nas-kernel-reminder.sh)"
+  check_file_contains_literal "$(target_path /etc/profile.d/nas-kernel-reminder.sh)" "IgnorePkg includes linux/linux-headers" "kernel reminder documents pacman pin"
+  check_path_exists "$(target_path /etc/zsh/zshrc)"
+  check_file_contains_literal "$(target_path /etc/zsh/zshrc)" "nas-kernel-reminder.sh" "zsh interactive shells source kernel reminder"
   if [[ "$SWAP_ENABLE" == "true" ]]; then
     check_path_exists "$(target_path "$SWAP_FILE")"
     check_file_contains_literal "$(target_path /etc/fstab)" "$SWAP_FILE none swap defaults 0 0" "swapfile is persistent in fstab"

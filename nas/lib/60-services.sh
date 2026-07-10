@@ -1,7 +1,11 @@
 configure_operations_basics() {
-  log "Phase: journald limits and backup placeholders"
+  log "Phase: journald limits, shell reminders, and backup placeholders"
   ensure_dir "$(target_path /etc/systemd/journald.conf.d)"
+  ensure_dir "$(target_path /etc/profile.d)"
+  ensure_dir "$(target_path /etc/zsh)"
   ensure_dir "$(target_path /usr/local/sbin)"
+  copy_with_backup "$NAS_ROOT/config/profile.d/nas-kernel-reminder.sh" "$(target_path /etc/profile.d/nas-kernel-reminder.sh)"
+  copy_with_backup "$NAS_ROOT/config/zsh/zshrc" "$(target_path /etc/zsh/zshrc)"
   backup_file "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)"
   write_text "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)" \
     "[Journal]"$'\n'"SystemMaxUse=$JOURNALD_SYSTEM_MAX_USE"$'\n'"RuntimeMaxUse=$JOURNALD_RUNTIME_MAX_USE"$'\n'"MaxRetentionSec=$JOURNALD_MAX_RETENTION_SEC"$'\n'
