@@ -4,6 +4,9 @@ configure_operations_basics() {
   ensure_dir "$(target_path /etc/profile.d)"
   ensure_dir "$(target_path /etc/zsh)"
   ensure_dir "$(target_path /usr/local/sbin)"
+  ensure_dir "$(target_path /var/lib/nas-secrets/locked)"
+  run chown root:root "$(target_path /var/lib/nas-secrets/locked)"
+  run chmod 0555 "$(target_path /var/lib/nas-secrets/locked)"
   copy_with_backup "$NAS_ROOT/config/profile.d/nas-kernel-reminder.sh" "$(target_path /etc/profile.d/nas-kernel-reminder.sh)"
   copy_with_backup "$NAS_ROOT/config/zsh/zshrc" "$(target_path /etc/zsh/zshrc)"
   backup_file "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)"
@@ -11,6 +14,8 @@ configure_operations_basics() {
     "[Journal]"$'\n'"SystemMaxUse=$JOURNALD_SYSTEM_MAX_USE"$'\n'"RuntimeMaxUse=$JOURNALD_RUNTIME_MAX_USE"$'\n'"MaxRetentionSec=$JOURNALD_MAX_RETENTION_SEC"$'\n'
   copy_with_backup "$NAS_ROOT/config/nas-notify" "$(target_path /usr/local/sbin/nas-notify)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-notify)"
+  copy_with_backup "$NAS_ROOT/config/nas-secrets" "$(target_path /usr/local/bin/nas-secrets)"
+  run chmod 0755 "$(target_path /usr/local/bin/nas-secrets)"
   copy_with_backup "$NAS_ROOT/config/nas-notify.env.example" "$(target_path /etc/nas-notify.env.example)"
   run chmod 0600 "$(target_path /etc/nas-notify.env.example)"
 }

@@ -33,9 +33,8 @@
    create mask = 0664
    directory mask = 0775
 
-# Do not export /data/secrets. It is reserved for sensitive material; choose an
-# explicit encryption workflow later and never mount decrypted secrets into
-# Docker containers.
+# Do not export /data/secrets. It is the manually unlocked gocryptfs plaintext
+# view. Never mount decrypted secrets into Docker containers.
 
 [replicas]
    path = /data/replicas

@@ -19,7 +19,7 @@ volume /mnt/disk1
   subvolume pool/docker
     snapshot_preserve 24h 7d 4w
 
-  subvolume pool/secrets
+  subvolume pool/.secrets-encrypted
     snapshot_preserve 72h 30d
 
   subvolume pool/media
@@ -37,7 +37,7 @@ volume /mnt/disk2
   subvolume pool/docker
     snapshot_preserve 24h 7d 4w
 
-  subvolume pool/secrets
+  subvolume pool/.secrets-encrypted
     snapshot_preserve 72h 30d
 
   subvolume pool/media
@@ -55,7 +55,7 @@ volume /mnt/disk3
   subvolume pool/docker
     snapshot_preserve 24h 7d 4w
 
-  subvolume pool/secrets
+  subvolume pool/.secrets-encrypted
     snapshot_preserve 72h 30d
 
   subvolume pool/media

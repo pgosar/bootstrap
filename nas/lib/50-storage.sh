@@ -35,13 +35,35 @@ configure_data_disk() {
   for subvol in "${POOL_SUBVOLUMES[@]}"; do
     if [[ -d "$active_mountpoint/pool/$subvol" ]]; then
       run chown "$PUID:$PGID" "$active_mountpoint/pool/$subvol"
-      run chmod 0775 "$active_mountpoint/pool/$subvol"
+      if [[ "$subvol" == .secrets-encrypted ]]; then
+        run chmod 0700 "$active_mountpoint/pool/$subvol"
+      else
+        run chmod 0775 "$active_mountpoint/pool/$subvol"
+      fi
       continue
     fi
     run btrfs subvolume create "$active_mountpoint/pool/$subvol"
     run chown "$PUID:$PGID" "$active_mountpoint/pool/$subvol"
-    run chmod 0775 "$active_mountpoint/pool/$subvol"
+    if [[ "$subvol" == .secrets-encrypted ]]; then
+      run chmod 0700 "$active_mountpoint/pool/$subvol"
+    else
+      run chmod 0775 "$active_mountpoint/pool/$subvol"
+    fi
   done
+  # Locked-state symlink. The unlock helper temporarily replaces it with the
+  # real gocryptfs mountpoint and restores it after unmounting.
+  if [[ "$APPLY" == true ]] && mountpoint -q "$(active_mount_path "$MERGERFS_MOUNT/secrets")"; then
+    log "+ encrypted secrets are unlocked; preserve active mountpoint $active_mountpoint/pool/secrets"
+  elif [[ "$APPLY" == true && -d "$active_mountpoint/pool/secrets" && ! -L "$active_mountpoint/pool/secrets" ]]; then
+    run rmdir "$active_mountpoint/pool/secrets" || die "$active_mountpoint/pool/secrets contains unexpected plaintext"
+  fi
+  if [[ "$APPLY" == true ]] && mountpoint -q "$(active_mount_path "$MERGERFS_MOUNT/secrets")"; then
+    :
+  elif [[ ! -L "$active_mountpoint/pool/secrets" ]]; then
+    run ln -s /var/lib/nas-secrets/locked "$active_mountpoint/pool/secrets"
+  elif [[ "$APPLY" == true && "$(readlink -- "$active_mountpoint/pool/secrets")" != /var/lib/nas-secrets/locked ]]; then
+    die "$active_mountpoint/pool/secrets has an unexpected symlink target"
+  fi
   # torrents lives inside media for hardlink compatibility with arr stack
   ensure_dir "$active_mountpoint/pool/media/torrents"
   run chown "$PUID:$PGID" "$active_mountpoint/pool/media/torrents"

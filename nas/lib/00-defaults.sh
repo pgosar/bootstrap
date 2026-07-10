@@ -69,10 +69,8 @@ POOL_SUBVOLUMES=(
   media
   personal
   replicas
-  # Sensitive material lives here, but encryption setup is intentionally a
-  # later explicit phase. Do not mount decrypted secrets into containers or
-  # export this path through Samba.
-  secrets
+  # Ciphertext only. The decrypted view is mounted manually at /data/secrets.
+  .secrets-encrypted
   staging
   appdata-bulk
   docker

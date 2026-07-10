@@ -309,6 +309,13 @@ check_common_data_mounts() {
       check_btrfs_subvolume "$path"
     done
     check_dir_exists "$mountpoint/pool/media/torrents"
+    if [[ -L "$mountpoint/pool/secrets" ]] && [[ "$(readlink -- "$mountpoint/pool/secrets")" == /var/lib/nas-secrets/locked ]]; then
+      check_pass "$mountpoint/pool/secrets uses the locked sentinel"
+    elif mountpoint -q "$(active_mount_path "$MERGERFS_MOUNT/secrets")"; then
+      check_pass "$mountpoint/pool/secrets is an active plaintext mountpoint"
+    else
+      check_fail "$mountpoint/pool/secrets is neither locked nor mounted"
+    fi
     if [[ -L "$mountpoint/pool/torrents" ]] && [[ "$(readlink "$mountpoint/pool/torrents")" == "media/torrents" ]]; then
       check_pass "$mountpoint/pool/torrents points to media/torrents"
     else
@@ -322,6 +329,14 @@ check_common_data_mounts() {
   check_mount_count_one "$(active_mount_path "$SNAPSHOT_VIEW_MOUNT")"
   check_mount_mergerfs_like "$(active_mount_path "$MERGERFS_MOUNT")" "$MERGERFS_MOUNT appears mergerfs-backed"
   check_mount_mergerfs_like "$(active_mount_path "$SNAPSHOT_VIEW_MOUNT")" "$SNAPSHOT_VIEW_MOUNT appears mergerfs-backed"
+  check_path_exists "$(target_path /usr/local/bin/nas-secrets)"
+  check_dir_exists "$(active_mount_path "$MERGERFS_MOUNT/secrets")"
+  check_dir_exists "$(active_mount_path "$MERGERFS_MOUNT/.secrets-encrypted")"
+  if [[ -f "$(active_mount_path "$MERGERFS_MOUNT/.secrets-encrypted/gocryptfs.conf")" ]]; then
+    check_pass "encrypted secrets are initialized"
+  else
+    check_warn "encrypted secrets await manual gocryptfs initialization"
+  fi
   check_mount_option_not_contains "$(active_mount_path "$MERGERFS_MOUNT")" "$MERGERFS_MOUNT is writable" "ro"
   check_mount_option_contains_any "$(active_mount_path "$SNAPSHOT_VIEW_MOUNT")" "$SNAPSHOT_VIEW_MOUNT is read-only" "ro"
   check_no_transport_error "$(active_mount_path "$MERGERFS_MOUNT")"
