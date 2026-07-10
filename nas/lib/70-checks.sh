@@ -477,6 +477,12 @@ check_common_pc_worker_orchestration() {
   check_path_exists "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/immich-ml-wake-proxy.py"
   check_path_exists "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/tdarr-wake-monitor.sh"
   check_path_exists "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/pc-worker-ensure.sh"
+  check_file_contains_literal "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/tdarr-wake-monitor.sh" \
+    "pc-auto-wake-boot-id" "PC shutdown requires matching automatic-wake boot ID"
+  check_file_contains_literal "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/pc-worker-ensure.sh" \
+    "pc-auto-wake-boot-id" "PC automatic wakes record the boot ID"
+  check_file_not_contains_literal "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/tdarr-wake-monitor.sh" \
+    "/dev/shm/pc-worker-job-triggered" "PC shutdown avoids transient SSH-session markers"
   check_unit_enabled immich-ml-wake-proxy.service true
   check_unit_enabled tdarr-wake-monitor.timer true
   if [[ "$TARGET_MODE" == "host" ]]; then
