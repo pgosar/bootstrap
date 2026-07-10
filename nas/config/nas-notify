@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly ENV_FILE="${NAS_NOTIFY_ENV_FILE:-/etc/nas-notify.env}"
+
+if [[ -r "$ENV_FILE" ]]; then
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+fi
+
+webhook_url="${NAS_NOTIFY_DISCORD_WEBHOOK_URL:-}"
+if [[ -z "$webhook_url" ]]; then
+  printf 'nas-notify: NAS_NOTIFY_DISCORD_WEBHOOK_URL is not configured in %s\n' "$ENV_FILE" >&2
+  exit 2
+fi
+
+case "$webhook_url" in
+  https://discord.com/api/webhooks/* | https://discordapp.com/api/webhooks/*) ;;
+  *)
+    printf 'nas-notify: configured webhook URL is not a Discord webhook\n' >&2
+    exit 2
+    ;;
+esac
+
+component="${1:-nas}"
+if (( $# > 0 )); then
+  shift
+fi
+
+if [[ -n "${SMARTD_DEVICE:-}" ]]; then
+  component="smartd"
+  message="${SMARTD_SUBJECT:-SMART warning}"
+  message+=$'\nDevice: '
+  message+="${SMARTD_DEVICESTRING:-$SMARTD_DEVICE}"
+  message+=$'\nReason: '
+  message+="${SMARTD_FAILTYPE:-unknown}"
+  if [[ -n "${SMARTD_MESSAGE:-}" ]]; then
+    message+=$'\n'
+    message+="$SMARTD_MESSAGE"
+  fi
+else
+  message="${*:-notification requested without a message}"
+fi
+
+hostname="$(hostname --short 2>/dev/null || hostname)"
+content="[$hostname][$component] $message"
+# Discord accepts at most 2,000 characters in a message.
+content="${content:0:1990}"
+payload="$(jq -cn --arg content "$content" '{content: $content}')"
+
+curl --config /dev/null --fail --silent --show-error --max-time 15 \
+  -H 'Content-Type: application/json' \
+  --data-binary "$payload" \
+  "$webhook_url" >/dev/null

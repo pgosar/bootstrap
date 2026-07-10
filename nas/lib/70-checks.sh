@@ -634,7 +634,15 @@ check_common_services() {
   else
     check_fail "nas-notify helper is executable"
   fi
-  check_file_contains_literal "$(target_path /usr/local/sbin/nas-notify)" "Placeholder notification helper" "nas-notify is clearly marked placeholder"
+  check_file_contains_literal "$(target_path /usr/local/sbin/nas-notify)" "NAS_NOTIFY_DISCORD_WEBHOOK_URL" "nas-notify has Discord delivery configured"
+  check_path_exists "$(target_path /etc/nas-notify.env.example)"
+  if [[ -f "$(target_path /etc/nas-notify.env)" ]]; then
+    check_pass "/etc/nas-notify.env exists"
+    check_file_contains_literal "$(target_path /etc/nas-notify.env)" "NAS_NOTIFY_DISCORD_WEBHOOK_URL=" "Discord webhook setting exists"
+  else
+    check_warn "/etc/nas-notify.env is missing; alerts cannot be delivered"
+  fi
+  check_path_exists "$(target_path /usr/local/bin/snapraid-scrub.sh)"
   if [[ "$GRUB_BTRFS_ENABLE" == "true" ]]; then
     check_unit_enabled grub-btrfsd.service false
   fi
