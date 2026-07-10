@@ -122,6 +122,30 @@ storage_line() {
   printf '%s: %s\n' "$path" "${usage:-unavailable}"
 }
 
+btrfs_usage_line() {
+  local path="$1" usage
+  usage="$(btrfs filesystem usage -b "$path" 2>/dev/null | awk '
+    function human(value, unit, idx) {
+      unit = "B"; idx = 1
+      while (value >= 1024 && idx < 5) {
+        value /= 1024
+        idx++
+      }
+      unit = (idx == 1 ? "B" : idx == 2 ? "KiB" : idx == 3 ? "MiB" : idx == 4 ? "GiB" : "TiB")
+      return sprintf("%.1f %s", value, unit)
+    }
+    /Device size:/ { size = $3 }
+    /^    Used:/ { used = $2 }
+    /Free \(estimated\):/ { free = $3 }
+    /Data ratio:/ { ratio = $3 }
+    END {
+      if (size == "") exit 1
+      printf "size=%s used=%s free=%s data-ratio=%s", human(size), human(used), human(free), ratio
+    }
+  ' || true)"
+  printf '%s: %s\n' "$path" "${usage:-unavailable}"
+}
+
 photos_manifest="$tmp_dir/photos.manifest"
 inbox_manifest="$tmp_dir/inbox.manifest"
 appdata_manifest="$tmp_dir/appdata.manifest"
@@ -162,6 +186,16 @@ docker_bad="$tmp_dir/docker.bad"
 docker ps -a --format '{{.Names}}\t{{.Status}}' 2>/dev/null |
   awk -F '\t' '$2 !~ /^Up / {print}' | head -n "$MAX_ITEMS" >"$docker_bad" || true
 docker_bad_count="$(docker ps -a --format '{{.Names}}\t{{.Status}}' 2>/dev/null | awk -F '\t' '$2 !~ /^Up / {count++} END {print count + 0}' || true)"
+docker_log_errors="$tmp_dir/docker.log.errors"
+: >"$docker_log_errors"
+while IFS= read -r container; do
+  [ -n "$container" ] || continue
+  log_count="$(docker logs --since 7d --tail 500 "$container" 2>&1 |
+    grep -Eic 'error|fatal|panic|critical|oom|out of memory|traceback|failed' || true)"
+  [ "$log_count" -gt 0 ] && printf '%s\t%s\n' "$log_count" "$container" >>"$docker_log_errors"
+done < <(docker ps --format '{{.Names}}' 2>/dev/null)
+sort -t $'\t' -k1,1nr "$docker_log_errors" -o "$docker_log_errors"
+docker_log_error_count="$(awk -F '\t' '{sum += $1} END {print sum + 0}' "$docker_log_errors")"
 
 journal_units="$tmp_dir/journal.units"
 journalctl --since '7 days ago' -p 0..3 -q -o json 2>/dev/null |
@@ -176,6 +210,15 @@ oom_count="$(journalctl -k --since '7 days ago' -q --no-pager 2>/dev/null | grep
 failed_units="$tmp_dir/failed.units"
 systemctl --failed --no-legend --no-pager 2>/dev/null | awk '{print $1}' | head -n "$MAX_ITEMS" >"$failed_units" || true
 failed_unit_count="$(systemctl --failed --no-legend --no-pager 2>/dev/null | awk 'NF {count++} END {print count + 0}' || true)"
+backup_failures="$tmp_dir/backup.failures"
+: >"$backup_failures"
+for unit in btrbk.service snapraid-sync.service snapraid-scrub.service; do
+  load_state="$(systemctl show "$unit" -p LoadState --value 2>/dev/null || true)"
+  [ "$load_state" = "loaded" ] || continue
+  result="$(systemctl show "$unit" -p Result --value 2>/dev/null || true)"
+  [ "$result" = "success" ] || printf '%s result=%s\n' "$unit" "${result:-unknown}" >>"$backup_failures"
+done
+backup_failure_count="$(wc -l <"$backup_failures")"
 
 secrets_state="locked/unavailable"
 if mountpoint -q /data/secrets 2>/dev/null; then
@@ -187,8 +230,10 @@ fi
 report="$REPORT_DIR/$(date +%Y-%m-%d).txt"
 {
   printf 'NAS weekly digest — %s\n\n' "$(date --iso-8601=seconds)"
-  printf 'Storage:\n'
-  storage_line /data
+  printf 'Btrfs usage:\n'
+  btrfs_usage_line /mnt/disk1
+  btrfs_usage_line /mnt/disk2
+  btrfs_usage_line /mnt/disk3
   storage_line /mnt/parity
   printf '\nChanges:\n'
   printf 'New photo files: %s\n' "$photos_count"
@@ -215,11 +260,15 @@ report="$REPORT_DIR/$(date +%Y-%m-%d).txt"
   printf '\nDocker:\n'
   printf 'Containers not Up: %s\n' "$docker_bad_count"
   sed -n '1,8p' "$docker_bad"
+  printf 'Log error-like lines (last 7 days): %s\n' "$docker_log_error_count"
+  awk -F '\t' '{print "- " $1 " lines " $2}' "$docker_log_errors"
   printf '\nFailures:\n'
   printf 'Journal priority 0-3 lines in last 7 days: %s\n' "$journal_error_count"
   printf 'SMART alert/error lines in last 7 days: %s\n' "$smartd_error_count"
   printf 'Kernel OOM/killed-process lines in last 7 days: %s\n' "$oom_count"
   printf 'Currently failed systemd units: %s\n' "$failed_unit_count"
+  printf 'Backup/parity failures: %s\n' "$backup_failure_count"
+  sed -n '1,8p' "$backup_failures"
   sed -n '1,8p' "$failed_units"
   sed -n '1,8p' "$journal_units"
 } >"$report"
@@ -234,15 +283,22 @@ cp "$appdata_manifest" "$STATE_DIR/appdata.manifest"
 ln -sfn "$(basename "$report")" "$REPORT_DIR/latest.txt"
 find "$REPORT_DIR" -maxdepth 1 -type f -name '20*.txt' -mtime +90 -delete
 
+critical_alerts="$tmp_dir/critical.alerts"
+: >"$critical_alerts"
+[ "$smartd_error_count" -gt 0 ] && printf 'SMARTD: %s alert/error lines in the last 7 days\n' "$smartd_error_count" >>"$critical_alerts"
+[ "$backup_failure_count" -gt 0 ] && printf 'BACKUP/PARITY: %s failed service result(s)\n' "$backup_failure_count" >>"$critical_alerts"
+[ "$docker_log_error_count" -gt 0 ] && printf 'DOCKER LOGS: %s error-like line(s) across running containers\n' "$docker_log_error_count" >>"$critical_alerts"
+[ "$oom_count" -gt 0 ] && printf 'KERNEL: %s OOM/killed-process line(s)\n' "$oom_count" >>"$critical_alerts"
+[ "$failed_unit_count" -gt 0 ] && printf 'SYSTEMD: %s unit(s) currently failed\n' "$failed_unit_count" >>"$critical_alerts"
+critical_count="$(wc -l <"$critical_alerts")"
+
 summary="$(cat <<EOF
-Weekly NAS digest ($(date +%Y-%m-%d))
-Photos +$photos_count | intake +$inbox_count (pending $pending_count) | appdata changed $appdata_count | large photos $large_count
-Docker not-Up: $docker_bad_count | journal errors: $journal_error_count | SMART alerts: $smartd_error_count
-Kernel OOM lines: $oom_count | failed systemd units: $failed_unit_count
-Snapshots/parity: see btrbk, SnapRAID sync, and scrub results in the local report
-Backup gaps: intake roots are intentionally outside configured btrbk/SnapRAID coverage
-SnapRAID exclusions with files: $excluded_count (review each)
-Secrets view: $secrets_state | full report: $report
+📊 NAS WEEKLY DIGEST ($(date +%Y-%m-%d))
+Changes: photos +$photos_count | intake +$inbox_count (pending $pending_count) | appdata changed $appdata_count | large photos $large_count
+Health: Docker not-Up $docker_bad_count | Docker log errors $docker_log_error_count | journal priority 0-3 $journal_error_count
+Protection: SnapRAID exclusions with files $excluded_count | secrets $secrets_state
+Storage: Btrfs usage and parity capacity are in the local report
+Full report: $report
 EOF
 )"
 if [ "$baseline" = "yes" ]; then
@@ -250,12 +306,18 @@ if [ "$baseline" = "yes" ]; then
 fi
 
 if [ "$NO_NOTIFY" = "true" ]; then
+  if [ "$critical_count" -gt 0 ]; then
+    printf '🚨 CRITICAL NAS ALERTS\n%s\n' "$(cat "$critical_alerts")"
+  fi
   printf '%s\n' "$summary"
 else
+  if [ "$critical_count" -gt 0 ]; then
+    /usr/local/sbin/nas-notify weekly-digest $'🚨 **CRITICAL NAS ALERTS**\n'"$(cat "$critical_alerts")"
+  fi
   /usr/local/sbin/nas-notify weekly-digest "$summary"
 fi
-if [ "$photos_count" -gt 0 ] || [ "$inbox_count" -gt 0 ] || [ "$appdata_count" -gt 0 ] || [ "$docker_bad_count" -gt 0 ] || [ "$journal_error_count" -gt 0 ] || [ "$excluded_count" -gt 0 ]; then
-  details="$(sed -n '1,90p' "$report")"
+if [ "$critical_count" -gt 0 ] || [ "$photos_count" -gt 0 ] || [ "$inbox_count" -gt 0 ] || [ "$appdata_count" -gt 0 ] || [ "$docker_bad_count" -gt 0 ] || [ "$excluded_count" -gt 0 ]; then
+  details="$(sed -n '1,70p' "$report")"
   if [ "$NO_NOTIFY" = "true" ]; then
     printf 'Details:\n%s\n' "$details"
   else
