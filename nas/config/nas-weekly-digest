@@ -13,6 +13,8 @@ readonly INBOX_ROOTS="${NAS_WEEKLY_DIGEST_INBOX_ROOTS:-/data/inbox /data/staging
 readonly SNAPRAID_POOL_ROOTS="${NAS_WEEKLY_DIGEST_SNAPRAID_POOL_ROOTS:-/mnt/disk1/pool/media /mnt/disk2/pool/media /mnt/disk3/pool/media}"
 readonly SNAPRAID_EXCLUDED_RELATIVE="${NAS_WEEKLY_DIGEST_SNAPRAID_EXCLUDED_RELATIVE:-torrents iso-mirror tdarr-test .transcode staging snapshots .snapshots '#recycle'}"
 readonly NO_NOTIFY="${NAS_WEEKLY_DIGEST_NO_NOTIFY:-false}"
+readonly RECENT_SUMMARY=/var/lib/nas-recent-files/latest-summary
+readonly DUPLICATE_SUMMARY=/var/lib/nas-duplicate-report/latest-summary
 
 mkdir -p "$STATE_DIR" "$REPORT_DIR" "$(dirname "$LOCK_FILE")"
 exec 9>"$LOCK_FILE"
@@ -26,6 +28,12 @@ existing_roots() {
   for root in $1; do
     [ -d "$root" ] && printf '%s\n' "$root"
   done
+}
+
+summary_value() {
+  local file="$1" key="$2"
+  [ -f "$file" ] || return 0
+  awk -F= -v key="$key" '$1 == key {sub(/^[^=]*=/, ""); print; exit}' "$file"
 }
 
 make_manifest() {
@@ -71,7 +79,7 @@ format_manifest_paths() {
       if (value >= 1024) { value /= 1024; unit = "TiB" }
       printf "- %.1f %s %s\n", value, unit, $1
     }
-  ' "$paths" "$manifest" | head -n "$MAX_ITEMS" >"$output"
+  ' "$paths" "$manifest" | sed -n "1,${MAX_ITEMS}p" >"$output"
 }
 
 count_files() {
@@ -86,7 +94,7 @@ large_new_files() {
   awk -F '\t' -v min="$LARGE_BYTES" '
     NR == FNR { wanted[$1] = 1; next }
     ($1 in wanted) && ($3 + 0 >= min) { print }
-  ' "$new" "$current" | sort -t $'\t' -k3,3nr | head -n "$MAX_ITEMS" >"$output"
+  ' "$new" "$current" | sort -t $'\t' -k3,3nr | sed -n "1,${MAX_ITEMS}p" >"$output"
 }
 
 populated_excluded_dirs() {
@@ -217,7 +225,7 @@ done
 
 docker_bad="$tmp_dir/docker.bad"
 docker ps -a --format '{{.Names}}\t{{.Status}}' 2>/dev/null |
-  awk -F '\t' '$2 !~ /^Up / {print}' | head -n "$MAX_ITEMS" >"$docker_bad" || true
+  awk -F '\t' '$2 !~ /^Up / {print}' | sed -n "1,${MAX_ITEMS}p" >"$docker_bad" || true
 docker_bad_count="$(docker ps -a --format '{{.Names}}\t{{.Status}}' 2>/dev/null | awk -F '\t' '$2 !~ /^Up / {count++} END {print count + 0}' || true)"
 docker_log_errors="$tmp_dir/docker.log.errors"
 : >"$docker_log_errors"
@@ -233,7 +241,7 @@ docker_log_error_count="$(awk -F '\t' '{sum += $1} END {print sum + 0}' "$docker
 journal_units="$tmp_dir/journal.units"
 journalctl --since '7 days ago' -p 0..3 -q -o json 2>/dev/null |
   jq -r '._SYSTEMD_UNIT // .SYSLOG_IDENTIFIER // "unknown"' |
-  sort | uniq -c | sort -nr | head -n "$MAX_ITEMS" >"$journal_units" || true
+  sort | uniq -c | sort -nr | sed -n "1,${MAX_ITEMS}p" >"$journal_units" || true
 journal_error_count="$(journalctl --since '7 days ago' -p 0..3 -q --no-pager 2>/dev/null | wc -l || true)"
 smartd_error_count="$(journalctl -u smartd.service --since '7 days ago' -q --no-pager 2>/dev/null |
   grep -Ei 'smart|self-test' |
@@ -241,7 +249,7 @@ smartd_error_count="$(journalctl -u smartd.service --since '7 days ago' -q --no-
   grep -Eic 'error|fail|critical|warning|alert' || true)"
 oom_count="$(journalctl -k --since '7 days ago' -q --no-pager 2>/dev/null | grep -Eci 'out of memory|killed process' || true)"
 failed_units="$tmp_dir/failed.units"
-systemctl --failed --no-legend --no-pager 2>/dev/null | awk '{print $1}' | head -n "$MAX_ITEMS" >"$failed_units" || true
+systemctl --failed --no-legend --no-pager 2>/dev/null | awk '{print $1}' | sed -n "1,${MAX_ITEMS}p" >"$failed_units" || true
 failed_unit_count="$(systemctl --failed --no-legend --no-pager 2>/dev/null | awk 'NF {count++} END {print count + 0}' || true)"
 backup_failures="$tmp_dir/backup.failures"
 : >"$backup_failures"
@@ -259,6 +267,27 @@ if mountpoint -q /data/secrets 2>/dev/null; then
 elif [ -d /data/secrets ]; then
   secrets_state="locked"
 fi
+
+recent_baseline="$(summary_value "$RECENT_SUMMARY" baseline)"
+recent_media="$(summary_value "$RECENT_SUMMARY" media)"
+recent_isos="$(summary_value "$RECENT_SUMMARY" isos)"
+recent_drive="$(summary_value "$RECENT_SUMMARY" drive)"
+recent_inbox="$(summary_value "$RECENT_SUMMARY" inbox)"
+recent_immich_images="$(summary_value "$RECENT_SUMMARY" immich_images)"
+recent_report="$(summary_value "$RECENT_SUMMARY" report)"
+recent_media="${recent_media:-0}"
+recent_isos="${recent_isos:-0}"
+recent_drive="${recent_drive:-0}"
+recent_inbox="${recent_inbox:-0}"
+recent_immich_images="${recent_immich_images:-0}"
+recent_total=$((recent_media + recent_isos + recent_drive + recent_inbox + recent_immich_images))
+duplicate_status="$(summary_value "$DUPLICATE_SUMMARY" status)"
+duplicate_files="$(summary_value "$DUPLICATE_SUMMARY" redundant_files)"
+duplicate_reclaimable="$(summary_value "$DUPLICATE_SUMMARY" reclaimable)"
+duplicate_report="$(summary_value "$DUPLICATE_SUMMARY" report)"
+duplicate_generated="$(summary_value "$DUPLICATE_SUMMARY" generated_at)"
+duplicate_files="${duplicate_files:-0}"
+duplicate_reclaimable="${duplicate_reclaimable:-pending}"
 
 report="$REPORT_DIR/$(date +%Y-%m-%d).txt"
 {
@@ -282,6 +311,12 @@ report="$REPORT_DIR/$(date +%Y-%m-%d).txt"
   sed -n '1,8p' "$appdata_items"
   printf 'New large photo files (>= 1 GiB): %s\n' "$large_count"
   awk -F '\t' '{print "- " $3 " " $1}' "$large_items"
+  printf 'Recent files report: media +%s | ISOs +%s | Drive +%s | Inbox +%s | Immich images +%s\n' "$recent_media" "$recent_isos" "$recent_drive" "$recent_inbox" "$recent_immich_images"
+  printf 'Recent files report path: %s\n' "${recent_report:-pending first run}"
+  [ "$recent_baseline" = yes ] && printf 'Recent files baseline was initialized this week.\n'
+  printf 'Duplicate analysis: status=%s | duplicate files=%s | reclaimable=%s\n' "${duplicate_status:-pending first monthly run}" "$duplicate_files" "$duplicate_reclaimable"
+  printf 'Duplicate report path: %s\n' "${duplicate_report:-pending first monthly run}"
+  [ -n "$duplicate_generated" ] && printf 'Duplicate analysis generated: %s\n' "$duplicate_generated"
   printf '\nProtection:\n'
   printf 'Configured intake roots currently containing files: %s\n' "$pending_count"
   printf 'Configured path(s) missing: %s\n' "${missing_roots:-none}"
@@ -335,7 +370,7 @@ critical_count="$(wc -l <"$critical_alerts")"
 
 summary="$(cat <<EOF
 📊 NAS WEEKLY DIGEST ($(date +%Y-%m-%d))
-Changes: photos +$photos_count | intake +$inbox_count (pending $pending_count) | appdata changed $appdata_count | large photos $large_count
+Changes: photos +$photos_count | intake +$inbox_count (pending $pending_count) | media +$recent_media | ISOs +$recent_isos | Drive +$recent_drive | Immich images +$recent_immich_images
 Health: Docker not-Up $docker_bad_count | Docker log errors $docker_log_error_count | journal priority 0-3 $journal_error_count | disk imbalance ${disk_imbalance_gib} GiB
 Protection: SnapRAID exclusions with files $excluded_count | secrets $secrets_state
 Storage: Btrfs usage and parity capacity are in the local report
@@ -357,7 +392,7 @@ else
   fi
   /usr/local/sbin/nas-notify weekly-digest "$summary"
 fi
-if [ "$critical_count" -gt 0 ] || [ "$photos_count" -gt 0 ] || [ "$inbox_count" -gt 0 ] || [ "$appdata_count" -gt 0 ] || [ "$docker_bad_count" -gt 0 ] || [ "$excluded_count" -gt 0 ]; then
+if [ "$critical_count" -gt 0 ] || [ "$photos_count" -gt 0 ] || [ "$inbox_count" -gt 0 ] || [ "$appdata_count" -gt 0 ] || [ "$docker_bad_count" -gt 0 ] || [ "$excluded_count" -gt 0 ] || [ "$recent_total" -gt 0 ]; then
   details="$(sed -n '1,70p' "$report")"
   if [ "$NO_NOTIFY" = "true" ]; then
     printf 'Details:\n%s\n' "$details"

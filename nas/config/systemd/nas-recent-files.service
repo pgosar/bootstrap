@@ -1,0 +1,11 @@
+[Unit]
+Description=Generate weekly recent-files report
+RequiresMountsFor=/data
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nas-recent-files
+StateDirectory=nas-recent-files
+Nice=10
+IOSchedulingClass=idle

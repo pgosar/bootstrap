@@ -394,7 +394,7 @@ check_common_fstab() {
 
 check_common_packages() {
   local package
-  for package in grub efibootmgr intel-ucode snapper snap-pac docker docker-compose samba btrbk yay mergerfs snapraid nftables smartmontools nvme-cli rsync restic jq curl hdparm lsscsi sg3_utils wol; do
+  for package in grub efibootmgr intel-ucode snapper snap-pac docker docker-compose samba btrbk yay mergerfs snapraid nftables smartmontools nvme-cli rsync restic jq curl hdparm lsscsi sg3_utils wol fclones; do
     check_package_installed "$package"
   done
   [[ "$GRUB_BTRFS_ENABLE" == "true" ]] && check_package_installed grub-btrfs
@@ -680,6 +680,12 @@ check_common_services() {
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-weekly-digest)" "docker logs" "weekly digest scans Docker logs"
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-weekly-digest)" "CRITICAL NAS ALERTS" "weekly digest emphasizes critical alerts"
   check_unit_enabled nas-weekly-digest.timer true
+  check_path_exists "$(target_path /usr/local/sbin/nas-recent-files)"
+  check_path_exists "$(target_path /usr/local/sbin/nas-duplicate-report)"
+  check_path_exists "$(target_path /etc/systemd/system/nas-recent-files.timer)"
+  check_path_exists "$(target_path /etc/systemd/system/nas-duplicate-report.timer)"
+  check_unit_enabled nas-recent-files.timer true
+  check_unit_enabled nas-duplicate-report.timer true
   check_path_exists "$(target_path /usr/local/bin/nas-btrfs-scrub)"
   check_path_exists "$(target_path /etc/systemd/system/nas-btrfs-scrub@.service)"
   check_unit_enabled nas-btrfs-scrub-disk1.timer true

@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly STATE_DIR=/var/lib/nas-recent-files
+readonly REPORT_DIR="$STATE_DIR/reports"
+readonly LOCK_FILE=/run/lock/nas-recent-files.lock
+readonly MAX_ITEMS=8
+
+mkdir -p "$STATE_DIR" "$REPORT_DIR" "$(dirname "$LOCK_FILE")"
+exec 9>"$LOCK_FILE"
+flock -n 9 || exit 0
+
+tmp_dir="$(mktemp -d "$STATE_DIR/.run.XXXXXX")"
+trap 'rm -rf "$tmp_dir"' EXIT
+
+make_manifest() {
+  local roots="$1" output="$2" root
+  : >"$output"
+  for root in $roots; do
+    [ -d "$root" ] || continue
+    find "$root" -xdev -type f -printf '%p\t%T@\t%s\n' 2>/dev/null || true
+  done | LC_ALL=C sort >"$output"
+}
+
+make_immich_manifest() {
+  local output="$1"
+  : >"$output"
+  for root in /data/personal/Photos/immich/library/library /data/personal/Photos/immich/library/upload; do
+    [ -d "$root" ] || continue
+    find "$root" -xdev -type f \( -iname '*.avif' -o -iname '*.bmp' -o -iname '*.cr2' -o -iname '*.cr3' -o -iname '*.dng' -o -iname '*.gif' -o -iname '*.heic' -o -iname '*.heif' -o -iname '*.jpeg' -o -iname '*.jpg' -o -iname '*.nef' -o -iname '*.orf' -o -iname '*.png' -o -iname '*.raf' -o -iname '*.rw2' -o -iname '*.tif' -o -iname '*.tiff' -o -iname '*.webp' \) -printf '%p\t%T@\t%s\n' 2>/dev/null || true
+  done | LC_ALL=C sort >"$output"
+}
+
+new_paths() {
+  local previous="$1" current="$2" output="$3"
+  if [ ! -f "$previous" ]; then
+    : >"$output"
+    return
+  fi
+  comm -13 <(cut -f1 "$previous") <(cut -f1 "$current") >"$output"
+}
+
+format_items() {
+  local paths="$1" manifest="$2" output="$3"
+  awk -F '\t' '
+    NR == FNR { wanted[$1] = 1; next }
+    ($1 in wanted) { print $2 "\t" $3 "\t" $1 }
+  ' "$paths" "$manifest" | sort -t $'\t' -k1,1nr | sed -n "1,${MAX_ITEMS}p" |
+  awk -F '\t' '
+    function human(value, unit, idx) {
+      unit = "B"; idx = 1
+      while (value >= 1024 && idx < 5) { value /= 1024; idx++ }
+      unit = (idx == 1 ? "B" : idx == 2 ? "KiB" : idx == 3 ? "MiB" : idx == 4 ? "GiB" : "TiB")
+      return sprintf("%.1f %s", value, unit)
+    }
+    { printf "- %s %s\n", human($2 + 0), $3 }
+  ' >"$output"
+}
+
+declare -A roots=(
+  [media]="/data/media/movies /data/media/tv /data/media/anime-movies /data/media/anime-tv /data/media/books /data/media/manga"
+  [isos]="/data/media/linux-isos"
+  [drive]="/data/personal/Drive"
+  [inbox]="/data/staging/inbox"
+)
+declare -A counts
+
+baseline=no
+for category in media isos drive inbox immich-images; do
+  [ -f "$STATE_DIR/$category.manifest" ] || baseline=yes
+done
+
+for category in media isos drive inbox; do
+  current="$tmp_dir/$category.manifest"
+  new="$tmp_dir/$category.new"
+  make_manifest "${roots[$category]}" "$current"
+  new_paths "$STATE_DIR/$category.manifest" "$current" "$new"
+  format_items "$new" "$current" "$tmp_dir/$category.items"
+  counts[$category]="$(wc -l <"$new")"
+  cp "$current" "$STATE_DIR/$category.manifest"
+done
+
+immich_current="$tmp_dir/immich-images.manifest"
+immich_new="$tmp_dir/immich-images.new"
+make_immich_manifest "$immich_current"
+new_paths "$STATE_DIR/immich-images.manifest" "$immich_current" "$immich_new"
+format_items "$immich_new" "$immich_current" "$tmp_dir/immich-images.items"
+counts[immich-images]="$(wc -l <"$immich_new")"
+cp "$immich_current" "$STATE_DIR/immich-images.manifest"
+
+report="$REPORT_DIR/$(date +%F).txt"
+{
+  printf 'Recent files report — %s\n\n' "$(date --iso-8601=seconds)"
+  [ "$baseline" = yes ] && printf 'Baseline initialized; additions are reported from the next run onward.\n\n'
+  for category in media isos drive inbox immich-images; do
+    label="${category//-/ }"
+    printf '%s: %s new file(s)\n' "$label" "${counts[$category]}"
+    sed -n '1,8p' "$tmp_dir/$category.items"
+  done
+} >"$report"
+
+cat >"$STATE_DIR/latest-summary" <<EOF
+baseline=$baseline
+media=${counts[media]}
+isos=${counts[isos]}
+drive=${counts[drive]}
+inbox=${counts[inbox]}
+immich_images=${counts[immich-images]}
+report=$report
+generated_at=$(date --iso-8601=seconds)
+EOF
+ln -sfn "$(basename "$report")" "$REPORT_DIR/latest.txt"
+find "$REPORT_DIR" -maxdepth 1 -type f -name '20*.txt' -mtime +90 -delete

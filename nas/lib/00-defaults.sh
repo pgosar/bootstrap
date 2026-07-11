@@ -51,6 +51,7 @@ PACMAN_PACKAGES=(
   dosfstools
   gptfdisk
   wol
+  fclones
 )
 
 PACMAN_IGNORE_PACKAGES=(

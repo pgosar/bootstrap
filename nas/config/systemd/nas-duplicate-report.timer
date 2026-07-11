@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule monthly exact duplicate-file report
+
+[Timer]
+OnCalendar=Sun *-*-22..28 11:30:00
+RandomizedDelaySec=30m
+Persistent=true
+Unit=nas-duplicate-report.service
+
+[Install]
+WantedBy=timers.target

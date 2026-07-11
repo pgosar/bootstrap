@@ -1,0 +1,11 @@
+[Unit]
+Description=Generate monthly exact duplicate-file report
+RequiresMountsFor=/data
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nas-duplicate-report
+StateDirectory=nas-duplicate-report
+Nice=19
+IOSchedulingClass=idle

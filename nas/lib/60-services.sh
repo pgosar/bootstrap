@@ -22,6 +22,13 @@ configure_operations_basics() {
   run chmod 0755 "$(target_path /usr/local/sbin/nas-weekly-digest)"
   copy_with_backup "$NAS_ROOT/config/systemd/nas-weekly-digest.service" "$(target_path /etc/systemd/system/nas-weekly-digest.service)"
   copy_with_backup "$NAS_ROOT/config/systemd/nas-weekly-digest.timer" "$(target_path /etc/systemd/system/nas-weekly-digest.timer)"
+  copy_with_backup "$NAS_ROOT/config/nas-recent-files" "$(target_path /usr/local/sbin/nas-recent-files)"
+  run chmod 0755 "$(target_path /usr/local/sbin/nas-recent-files)"
+  copy_with_backup "$NAS_ROOT/config/nas-duplicate-report" "$(target_path /usr/local/sbin/nas-duplicate-report)"
+  run chmod 0755 "$(target_path /usr/local/sbin/nas-duplicate-report)"
+  for unit in nas-recent-files.service nas-recent-files.timer nas-duplicate-report.service nas-duplicate-report.timer; do
+    copy_with_backup "$NAS_ROOT/config/systemd/$unit" "$(target_path "/etc/systemd/system/$unit")"
+  done
   copy_with_backup "$NAS_ROOT/config/nas-secrets" "$(target_path /usr/local/bin/nas-secrets)"
   run chmod 0755 "$(target_path /usr/local/bin/nas-secrets)"
   copy_with_backup "$NAS_ROOT/config/nas-notify.env.example" "$(target_path /etc/nas-notify.env.example)"
@@ -286,6 +293,8 @@ enable_services() {
   target_run systemctl enable systemd-timesyncd.service
   target_run systemctl enable nas-kernel-maintenance-reminder.timer
   target_run systemctl enable nas-weekly-digest.timer
+  target_run systemctl enable nas-recent-files.timer
+  target_run systemctl enable nas-duplicate-report.timer
   if [[ "$START_SERVICES" == true && "$TARGET_MODE" == "host" ]]; then
     target_run systemctl start systemd-timesyncd.service
   fi

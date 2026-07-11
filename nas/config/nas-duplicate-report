@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly STATE_DIR=/var/lib/nas-duplicate-report
+readonly REPORT_DIR="$STATE_DIR/reports"
+readonly LOCK_FILE=/run/lock/nas-duplicate-report.lock
+readonly CACHE_DIR="$STATE_DIR/cache"
+
+mkdir -p "$REPORT_DIR" "$CACHE_DIR" "$(dirname "$LOCK_FILE")"
+exec 9>"$LOCK_FILE"
+flock -n 9 || exit 0
+
+readonly report="$REPORT_DIR/$(date +%F).txt"
+readonly log="$STATE_DIR/fclones-$(date +%F).log"
+readonly -a roots=(
+  /data/media/movies
+  /data/media/tv
+  /data/media/anime-movies
+  /data/media/anime-tv
+  /data/media/books
+  /data/media/manga
+  /data/media/linux-isos
+  /data/personal/Drive
+)
+
+existing=()
+for root in "${roots[@]}"; do
+  [ -d "$root" ] && existing+=("$root")
+done
+[ "${#existing[@]}" -gt 0 ] || exit 0
+
+XDG_CACHE_HOME="$CACHE_DIR" nice -n 19 ionice -c3 \
+  fclones --progress=false group --cache --one-fs --hash-fn sha256 --threads hdd:1,1 \
+  --exclude '**/*.trickplay/**' --output "$report" "${existing[@]}" 2>"$log"
+
+groups="$(grep -Eo 'Found [0-9]+ .* redundant files' "$log" | tail -1 || true)"
+redundant_files="$(grep -Eo 'Found [0-9]+ .* redundant files' "$log" | tail -1 | awk '{print $2}' || true)"
+redundant_bytes="$(grep -Eo 'Found [0-9]+ \([^)]*\) redundant files' "$log" | tail -1 | sed -E 's/^Found [0-9]+ \(([^)]*)\).*/\1/' || true)"
+cat >"$STATE_DIR/latest-summary" <<EOF
+status=success
+redundant_files=${redundant_files:-0}
+reclaimable=${redundant_bytes:-0 B}
+report=$report
+generated_at=$(date --iso-8601=seconds)
+summary=${groups:-no duplicate groups found}
+EOF
+ln -sfn "$(basename "$report")" "$REPORT_DIR/latest.txt"
+find "$REPORT_DIR" -maxdepth 1 -type f -name '20*.txt' -mtime +90 -delete
+find "$STATE_DIR" -maxdepth 1 -type f -name 'fclones-20*.log' -mtime +90 -delete

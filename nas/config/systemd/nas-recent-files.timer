@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule weekly recent-files report
+
+[Timer]
+OnCalendar=Sun 08:15
+RandomizedDelaySec=5m
+Persistent=true
+Unit=nas-recent-files.service
+
+[Install]
+WantedBy=timers.target
