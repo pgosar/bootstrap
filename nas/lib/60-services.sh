@@ -26,7 +26,9 @@ configure_operations_basics() {
   run chmod 0755 "$(target_path /usr/local/sbin/nas-recent-files)"
   copy_with_backup "$NAS_ROOT/config/nas-duplicate-report" "$(target_path /usr/local/sbin/nas-duplicate-report)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-duplicate-report)"
-  for unit in nas-recent-files.service nas-recent-files.timer nas-duplicate-report.service nas-duplicate-report.timer; do
+  copy_with_backup "$NAS_ROOT/config/nas-nextcloud-external-scan" "$(target_path /usr/local/sbin/nas-nextcloud-external-scan)"
+  run chmod 0755 "$(target_path /usr/local/sbin/nas-nextcloud-external-scan)"
+  for unit in nas-recent-files.service nas-recent-files.timer nas-duplicate-report.service nas-duplicate-report.timer nas-nextcloud-external-scan.service nas-nextcloud-external-scan.timer; do
     copy_with_backup "$NAS_ROOT/config/systemd/$unit" "$(target_path "/etc/systemd/system/$unit")"
   done
   copy_with_backup "$NAS_ROOT/config/nas-secrets" "$(target_path /usr/local/bin/nas-secrets)"
@@ -297,6 +299,7 @@ enable_services() {
   target_run systemctl enable nas-weekly-digest.timer
   target_run systemctl enable nas-recent-files.timer
   target_run systemctl enable nas-duplicate-report.timer
+  target_run systemctl enable nas-nextcloud-external-scan.timer
   if [[ "$START_SERVICES" == true && "$TARGET_MODE" == "host" ]]; then
     target_run systemctl start systemd-timesyncd.service
   fi

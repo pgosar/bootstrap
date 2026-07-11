@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+exec /usr/bin/docker exec -u 33 nextcloud_app php occ files:scan chilly

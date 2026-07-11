@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh Nextcloud external-storage file cache
+Requires=docker.service
+After=docker.service
+RequiresMountsFor=/data
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nas-nextcloud-external-scan
+Nice=10
+IOSchedulingClass=idle
