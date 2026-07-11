@@ -685,6 +685,9 @@ check_common_services() {
   check_unit_enabled nas-btrfs-scrub-disk1.timer true
   check_unit_enabled nas-btrfs-scrub-disk2.timer true
   check_unit_enabled nas-btrfs-scrub-disk3.timer true
+  check_path_exists "$(target_path /usr/local/sbin/nas-url-queue-notify)"
+  check_path_exists "$(target_path /usr/local/sbin/nas-url-queue-tailscale)"
+  check_unit_enabled nas-url-queue-notify.path true
   check_path_exists "$(target_path /etc/nas-notify.env.example)"
   if [[ -f "$(target_path /etc/nas-notify.env)" ]]; then
     check_pass "/etc/nas-notify.env exists"

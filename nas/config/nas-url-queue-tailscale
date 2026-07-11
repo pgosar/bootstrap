@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! tailscale status --json | jq -e '.BackendState == "Running"' >/dev/null; then
+  printf 'Tailscale is not authenticated; run sudo tailscale up first.\n' >&2
+  exit 1
+fi
+
+exec tailscale serve --bg --https=443 --set-path=/url-queue http://127.0.0.1:8787

@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly EVENTS_DIR=/data/docker/appdata/url-queue/events
+readonly SENT_DIR="$EVENTS_DIR/sent"
+
+mkdir -p "$SENT_DIR"
+shopt -s nullglob
+for event in "$EVENTS_DIR"/*.json; do
+  id="$(jq -r '.id // "unknown"' "$event")"
+  outcome="$(jq -r '.outcome // "failed"' "$event")"
+  mode="$(jq -r '.mode // "auto"' "$event")"
+  detail="$(jq -r '.detail // "No detail supplied"' "$event")"
+  case "$outcome" in
+    completed)
+      if ! docker exec -u 33 nextcloud_app php occ files:scan --path='/chilly/files/Inbox' >/dev/null; then
+        detail="$detail; Nextcloud Inbox scan failed"
+      fi
+      message="✅ URL queue job $id completed ($mode): $detail"
+      ;;
+    *) message="🚨 URL queue job $id failed ($mode): $detail" ;;
+  esac
+  /usr/local/sbin/nas-notify url-queue "$message" && mv "$event" "$SENT_DIR/"
+done

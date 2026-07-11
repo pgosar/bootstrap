@@ -26,6 +26,12 @@ configure_operations_basics() {
   run chmod 0755 "$(target_path /usr/local/bin/nas-secrets)"
   copy_with_backup "$NAS_ROOT/config/nas-notify.env.example" "$(target_path /etc/nas-notify.env.example)"
   run chmod 0600 "$(target_path /etc/nas-notify.env.example)"
+  copy_with_backup "$NAS_ROOT/config/nas-url-queue-notify" "$(target_path /usr/local/sbin/nas-url-queue-notify)"
+  run chmod 0755 "$(target_path /usr/local/sbin/nas-url-queue-notify)"
+  copy_with_backup "$NAS_ROOT/config/nas-url-queue-tailscale" "$(target_path /usr/local/sbin/nas-url-queue-tailscale)"
+  run chmod 0755 "$(target_path /usr/local/sbin/nas-url-queue-tailscale)"
+  copy_with_backup "$NAS_ROOT/config/systemd/nas-url-queue-notify.service" "$(target_path /etc/systemd/system/nas-url-queue-notify.service)"
+  copy_with_backup "$NAS_ROOT/config/systemd/nas-url-queue-notify.path" "$(target_path /etc/systemd/system/nas-url-queue-notify.path)"
   copy_with_backup "$NAS_ROOT/config/btrfs-scrub.sh" "$(target_path /usr/local/bin/nas-btrfs-scrub)"
   run chmod 0755 "$(target_path /usr/local/bin/nas-btrfs-scrub)"
   copy_with_backup "$NAS_ROOT/config/systemd/nas-btrfs-scrub@.service" "$(target_path /etc/systemd/system/nas-btrfs-scrub@.service)"
@@ -322,6 +328,7 @@ enable_services() {
     target_run systemctl enable btrbk.timer
   fi
   target_run systemctl enable nas-btrfs-scrub-disk1.timer nas-btrfs-scrub-disk2.timer nas-btrfs-scrub-disk3.timer
+  target_run systemctl enable nas-url-queue-notify.path
   if [[ "$SNAPPER_ENABLE" == "true" ]]; then
     target_run systemctl enable snapper-timeline.timer snapper-cleanup.timer
     if [[ "$START_SERVICES" == true && "$TARGET_MODE" == "host" ]]; then

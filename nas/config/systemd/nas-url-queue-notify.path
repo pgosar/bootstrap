@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch URL queue notification events
+
+[Path]
+PathChanged=/data/docker/appdata/url-queue/events
+Unit=nas-url-queue-notify.service
+
+[Install]
+WantedBy=multi-user.target

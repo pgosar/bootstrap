@@ -1,0 +1,7 @@
+[Unit]
+Description=Send URL queue completion notifications
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nas-url-queue-notify
