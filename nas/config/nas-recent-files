@@ -60,17 +60,17 @@ format_items() {
 declare -A roots=(
   [media]="/data/media/movies /data/media/tv /data/media/anime-movies /data/media/anime-tv /data/media/books /data/media/manga"
   [isos]="/data/media/linux-isos"
-  [drive]="/data/personal/Drive"
+  [personal]="/data/personal/ImportantDocuments /data/personal/Travel Queue"
   [inbox]="/data/staging/inbox"
 )
 declare -A counts
 
 baseline=no
-for category in media isos drive inbox immich-images; do
+for category in media isos personal inbox immich-images; do
   [ -f "$STATE_DIR/$category.manifest" ] || baseline=yes
 done
 
-for category in media isos drive inbox; do
+for category in media isos personal inbox; do
   current="$tmp_dir/$category.manifest"
   new="$tmp_dir/$category.new"
   make_manifest "${roots[$category]}" "$current"
@@ -92,7 +92,7 @@ report="$REPORT_DIR/$(date +%F).txt"
 {
   printf 'Recent files report — %s\n\n' "$(date --iso-8601=seconds)"
   [ "$baseline" = yes ] && printf 'Baseline initialized; additions are reported from the next run onward.\n\n'
-  for category in media isos drive inbox immich-images; do
+  for category in media isos personal inbox immich-images; do
     label="${category//-/ }"
     printf '%s: %s new file(s)\n' "$label" "${counts[$category]}"
     sed -n '1,8p' "$tmp_dir/$category.items"
@@ -103,7 +103,7 @@ cat >"$STATE_DIR/latest-summary" <<EOF
 baseline=$baseline
 media=${counts[media]}
 isos=${counts[isos]}
-drive=${counts[drive]}
+personal=${counts[personal]}
 inbox=${counts[inbox]}
 immich_images=${counts[immich-images]}
 report=$report

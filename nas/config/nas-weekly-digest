@@ -271,16 +271,16 @@ fi
 recent_baseline="$(summary_value "$RECENT_SUMMARY" baseline)"
 recent_media="$(summary_value "$RECENT_SUMMARY" media)"
 recent_isos="$(summary_value "$RECENT_SUMMARY" isos)"
-recent_drive="$(summary_value "$RECENT_SUMMARY" drive)"
+recent_personal="$(summary_value "$RECENT_SUMMARY" personal)"
 recent_inbox="$(summary_value "$RECENT_SUMMARY" inbox)"
 recent_immich_images="$(summary_value "$RECENT_SUMMARY" immich_images)"
 recent_report="$(summary_value "$RECENT_SUMMARY" report)"
 recent_media="${recent_media:-0}"
 recent_isos="${recent_isos:-0}"
-recent_drive="${recent_drive:-0}"
+recent_personal="${recent_personal:-0}"
 recent_inbox="${recent_inbox:-0}"
 recent_immich_images="${recent_immich_images:-0}"
-recent_total=$((recent_media + recent_isos + recent_drive + recent_inbox + recent_immich_images))
+recent_total=$((recent_media + recent_isos + recent_personal + recent_inbox + recent_immich_images))
 duplicate_status="$(summary_value "$DUPLICATE_SUMMARY" status)"
 duplicate_files="$(summary_value "$DUPLICATE_SUMMARY" redundant_files)"
 duplicate_reclaimable="$(summary_value "$DUPLICATE_SUMMARY" reclaimable)"
@@ -311,7 +311,7 @@ report="$REPORT_DIR/$(date +%Y-%m-%d).txt"
   sed -n '1,8p' "$appdata_items"
   printf 'New large photo files (>= 1 GiB): %s\n' "$large_count"
   awk -F '\t' '{print "- " $3 " " $1}' "$large_items"
-  printf 'Recent files report: media +%s | ISOs +%s | Drive +%s | Inbox +%s | Immich images +%s\n' "$recent_media" "$recent_isos" "$recent_drive" "$recent_inbox" "$recent_immich_images"
+  printf 'Recent files report: media +%s | ISOs +%s | Personal +%s | Inbox +%s | Immich images +%s\n' "$recent_media" "$recent_isos" "$recent_personal" "$recent_inbox" "$recent_immich_images"
   printf 'Recent files report path: %s\n' "${recent_report:-pending first run}"
   [ "$recent_baseline" = yes ] && printf 'Recent files baseline was initialized this week.\n'
   printf 'Duplicate analysis: status=%s | duplicate files=%s | reclaimable=%s\n' "${duplicate_status:-pending first monthly run}" "$duplicate_files" "$duplicate_reclaimable"
@@ -370,7 +370,7 @@ critical_count="$(wc -l <"$critical_alerts")"
 
 summary="$(cat <<EOF
 📊 NAS WEEKLY DIGEST ($(date +%Y-%m-%d))
-Changes: photos +$photos_count | intake +$inbox_count (pending $pending_count) | media +$recent_media | ISOs +$recent_isos | Drive +$recent_drive | Immich images +$recent_immich_images
+Changes: photos +$photos_count | intake +$inbox_count (pending $pending_count) | media +$recent_media | ISOs +$recent_isos | Personal +$recent_personal | Immich images +$recent_immich_images
 Health: Docker not-Up $docker_bad_count | Docker log errors $docker_log_error_count | journal priority 0-3 $journal_error_count | disk imbalance ${disk_imbalance_gib} GiB
 Protection: SnapRAID exclusions with files $excluded_count | secrets $secrets_state
 Storage: Btrfs usage and parity capacity are in the local report

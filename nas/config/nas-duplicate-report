@@ -20,7 +20,8 @@ readonly -a roots=(
   /data/media/books
   /data/media/manga
   /data/media/linux-isos
-  /data/personal/Drive
+  /data/personal/ImportantDocuments
+  /data/personal/Travel Queue
 )
 
 existing=()
