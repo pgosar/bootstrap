@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly endpoint="${NAS_CLIPBOARD_ENDPOINT:-https://stealth-nas.taile47b24.ts.net/clipboard/v1/clipboard/pc}"
+readonly state_file="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/nas-clipboard-pc.id"
+last_id="$(cat "$state_file" 2>/dev/null || true)"
+
+wayland_display() {
+  local socket
+  for socket in "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/wayland-*; do
+    [ -S "$socket" ] && basename "$socket" && return 0
+  done
+  return 1
+}
+
+while true; do
+  response="$(curl --silent --show-error --fail --max-time 15 "$endpoint?after=$last_id" || true)"
+  if [ -n "$response" ]; then
+    id="$(jq -r '.id // empty' <<<"$response")"
+    text="$(jq -r '.text // empty' <<<"$response")"
+    if [ -n "$id" ] && [ -n "$text" ]; then
+      if display="$(wayland_display)"; then
+        printf '%s' "$text" | WAYLAND_DISPLAY="$display" wl-copy --type text/plain
+        printf '%s\n' "$id" >"$state_file"
+        last_id="$id"
+      fi
+    fi
+  fi
+  sleep 2
+done

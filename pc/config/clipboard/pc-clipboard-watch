@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+wayland_display() {
+  local socket
+  for socket in "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/wayland-*; do
+    [ -S "$socket" ] && basename "$socket" && return 0
+  done
+  return 1
+}
+
+while true; do
+  if display="$(wayland_display)"; then
+    WAYLAND_DISPLAY="$display" wl-paste --type text --watch /usr/local/bin/pc-clipboard-publish || true
+  fi
+  sleep 5
+done

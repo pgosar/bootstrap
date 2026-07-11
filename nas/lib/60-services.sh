@@ -37,6 +37,8 @@ configure_operations_basics() {
   run chmod 0755 "$(target_path /usr/local/sbin/nas-url-queue-notify)"
   copy_with_backup "$NAS_ROOT/config/nas-url-queue-tailscale" "$(target_path /usr/local/sbin/nas-url-queue-tailscale)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-url-queue-tailscale)"
+  copy_with_backup "$NAS_ROOT/config/nas-clipboard-tailscale" "$(target_path /usr/local/sbin/nas-clipboard-tailscale)"
+  run chmod 0755 "$(target_path /usr/local/sbin/nas-clipboard-tailscale)"
   copy_with_backup "$NAS_ROOT/config/systemd/nas-url-queue-notify.service" "$(target_path /etc/systemd/system/nas-url-queue-notify.service)"
   copy_with_backup "$NAS_ROOT/config/systemd/nas-url-queue-notify.path" "$(target_path /etc/systemd/system/nas-url-queue-notify.path)"
   copy_with_backup "$NAS_ROOT/config/btrfs-scrub.sh" "$(target_path /usr/local/bin/nas-btrfs-scrub)"

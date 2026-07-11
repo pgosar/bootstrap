@@ -121,6 +121,7 @@ dunst
 xsettingsd
 cliphist
 wl-clipboard
+tailscale
 yazi
 firefox
 nextcloud-client

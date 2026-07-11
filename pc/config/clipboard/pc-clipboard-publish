@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly endpoint="${NAS_CLIPBOARD_ENDPOINT:-https://stealth-nas.taile47b24.ts.net/clipboard/v1/clipboard/phone}"
+text="$(cat)"
+[ -n "$text" ] || exit 0
+payload="$(printf '%s' "$text" | jq -Rs '{text: .}')"
+curl --silent --show-error --fail --max-time 15 -H 'Content-Type: application/json' --data "$payload" "$endpoint" >/dev/null
