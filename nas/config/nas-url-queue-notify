@@ -9,9 +9,11 @@ shopt -s nullglob
 for event in "$EVENTS_DIR"/*.json; do
   id="$(jq -r '.id // "unknown"' "$event")"
   outcome="$(jq -r '.outcome // "failed"' "$event")"
+  source="$(jq -r '.source // "unknown source"' "$event")"
   mode="$(jq -r '.mode // "auto"' "$event")"
   detail="$(jq -r '.detail // "No detail supplied"' "$event")"
   case "$outcome" in
+    started) message="⏳ URL queue job $id started ($mode from $source)" ;;
     completed)
       if ! docker exec -u 33 nextcloud_app php occ files:scan --path='/chilly/files/Inbox' >/dev/null; then
         detail="$detail; Nextcloud Inbox scan failed"
