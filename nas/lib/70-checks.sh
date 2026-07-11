@@ -394,7 +394,7 @@ check_common_fstab() {
 
 check_common_packages() {
   local package
-  for package in grub efibootmgr intel-ucode snapper snap-pac docker docker-compose samba btrbk yay mergerfs snapraid nftables smartmontools nvme-cli rsync restic jq curl hdparm lsscsi sg3_utils wol fclones; do
+  for package in grub efibootmgr intel-ucode snapper snap-pac docker docker-compose samba btrbk yay mergerfs snapraid informant nftables smartmontools nvme-cli rsync restic jq curl hdparm lsscsi sg3_utils wol fclones; do
     check_package_installed "$package"
   done
   [[ "$GRUB_BTRFS_ENABLE" == "true" ]] && check_package_installed grub-btrfs
