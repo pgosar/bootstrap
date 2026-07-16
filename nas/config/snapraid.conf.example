@@ -8,18 +8,26 @@ content /mnt/disk1/snapraid.content
 content /mnt/disk2/snapraid.content
 content /mnt/disk3/snapraid.content
 
-data d1 /mnt/disk1/pool/media/
-data d2 /mnt/disk2/pool/media/
-data d3 /mnt/disk3/pool/media/
+# Each physical disk exposes one protected pool root. The ordinary directories
+# under it (media, personal, replicas, and .secrets-encrypted) are protected.
+# Mutable or independently managed nested Btrfs subvolumes stay excluded.
+data d1 /mnt/disk1/pool/
+data d2 /mnt/disk2/pool/
+data d3 /mnt/disk3/pool/
 
 exclude *.unrecoverable
 exclude /tmp/
 exclude /lost+found/
-exclude torrents/
-exclude iso-mirror/
-exclude tdarr-test/
-exclude .transcode/
-exclude staging/
+exclude /docker/
+exclude /staging/
+exclude /downloads/
+exclude /torrents
+exclude /appdata-bulk/
+exclude /backups/
+exclude /.Trash-1000/
+exclude /media/torrents/
+exclude /media/tdarr-test/
+exclude /media/.transcode/
 exclude snapshots/
 exclude .snapshots/
 exclude #recycle/
