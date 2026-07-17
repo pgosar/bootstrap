@@ -37,6 +37,7 @@ PACMAN_PACKAGES=(
   btrbk
   restic
   age
+  sops
   gocryptfs
   msmtp
   mailutils
