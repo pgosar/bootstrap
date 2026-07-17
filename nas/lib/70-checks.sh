@@ -296,13 +296,22 @@ check_common_os_mounts() {
 }
 
 check_common_data_mounts() {
-  local idx mountpoint subvol path
+  local idx mountpoint directory subvol path
   for idx in "${!DATA_DISK_LABELS[@]}"; do
     mountpoint="$(active_mount_path "/mnt/disk$((idx + 1))")"
     check_mount_exists "$mountpoint"
     check_mount_fstype "$mountpoint" btrfs "$mountpoint is btrfs"
     check_dir_exists "$mountpoint/pool"
     check_dir_exists "$mountpoint/snapshots"
+    for directory in "${POOL_DIRECTORIES[@]}"; do
+      path="$mountpoint/pool/$directory"
+      check_dir_exists "$path"
+      if btrfs subvolume show "$path" >/dev/null 2>&1; then
+        check_fail "$path is an ordinary protected directory"
+      else
+        check_pass "$path is an ordinary protected directory"
+      fi
+    done
     for subvol in "${POOL_SUBVOLUMES[@]}"; do
       path="$mountpoint/pool/$subvol"
       check_dir_exists "$path"

@@ -67,12 +67,19 @@ BTRFS_OS_MOUNT_OPTS="rw,noatime,compress=zstd:3,space_cache=v2"
 OS_SUBVOL_TEMP_MOUNT="/mnt/.nas-bootstrap-rootfs"
 TARGET_MODE="host"
 
-POOL_SUBVOLUMES=(
+# Protected content stays inside the pool subvolume as ordinary directories so
+# SnapRAID can cover the pool root without crossing nested subvolume boundaries.
+POOL_DIRECTORIES=(
   media
   personal
   replicas
   # Ciphertext only. The decrypted view is mounted manually at /data/secrets.
   .secrets-encrypted
+)
+
+# High-churn or independently managed data remains in nested subvolumes and is
+# excluded from SnapRAID and btrbk's protected-pool snapshot.
+POOL_SUBVOLUMES=(
   staging
   appdata-bulk
   docker

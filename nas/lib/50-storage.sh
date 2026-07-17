@@ -31,7 +31,16 @@ configure_data_disk() {
   ensure_dir "$active_mountpoint/snapshots"
   run chown "$PUID:$PGID" "$active_mountpoint/pool"
   run chmod 0775 "$active_mountpoint/pool"
-  local subvol
+  local directory subvol
+  for directory in "${POOL_DIRECTORIES[@]}"; do
+    ensure_dir "$active_mountpoint/pool/$directory"
+    run chown "$PUID:$PGID" "$active_mountpoint/pool/$directory"
+    if [[ "$directory" == .secrets-encrypted ]]; then
+      run chmod 0700 "$active_mountpoint/pool/$directory"
+    else
+      run chmod 0775 "$active_mountpoint/pool/$directory"
+    fi
+  done
   for subvol in "${POOL_SUBVOLUMES[@]}"; do
     if [[ -d "$active_mountpoint/pool/$subvol" ]]; then
       run chown "$PUID:$PGID" "$active_mountpoint/pool/$subvol"
@@ -324,19 +333,30 @@ verify_dir_exists() {
 }
 
 verify_active_pool_visible() {
-  local active_data subvol
+  local active_data directory subvol
   active_data="$(active_mount_path "$MERGERFS_MOUNT")"
 
+  for directory in "${POOL_DIRECTORIES[@]}"; do
+    [[ -d "$active_data/$directory" ]] || die "$active_data/$directory is missing after mergerfs mount"
+  done
   for subvol in "${POOL_SUBVOLUMES[@]}"; do
     [[ -d "$active_data/$subvol" ]] || die "$active_data/$subvol is missing after mergerfs mount"
   done
 }
 
 ensure_active_pool_permissions() {
-  local active_data subvol
+  local active_data directory subvol
   active_data="$(active_mount_path "$MERGERFS_MOUNT")"
   run chown "$PUID:$PGID" "$active_data"
   run chmod 0775 "$active_data"
+  for directory in "${POOL_DIRECTORIES[@]}"; do
+    run chown "$PUID:$PGID" "$active_data/$directory"
+    if [[ "$directory" == .secrets-encrypted ]]; then
+      run chmod 0700 "$active_data/$directory"
+    else
+      run chmod 0775 "$active_data/$directory"
+    fi
+  done
   for subvol in "${POOL_SUBVOLUMES[@]}"; do
     run chown "$PUID:$PGID" "$active_data/$subvol"
     run chmod 0775 "$active_data/$subvol"
