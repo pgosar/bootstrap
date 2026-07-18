@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""Persist NAS availability from a fixed commissioning baseline."""
+
+import json
+import os
+import subprocess
+import tempfile
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+BASELINE = datetime(2026, 7, 7, 23, 37, 58, tzinfo=timezone.utc)
+STATE_DIR = Path("/var/lib/nas-uptime")
+STATE_FILE = STATE_DIR / "state.json"
+STATUS_FILE = STATE_DIR / "status.json"
+
+
+def boot_id() -> str:
+    return Path("/proc/sys/kernel/random/boot_id").read_text().strip().replace("-", "")
+
+
+def boot_epoch() -> int:
+    for line in Path("/proc/stat").read_text().splitlines():
+        if line.startswith("btime "):
+            return int(line.split()[1])
+    raise RuntimeError("unable to determine current boot time")
+
+
+def journal_seed(now: int, current_boot: str, current_boot_epoch: int) -> int:
+    """Sum retained completed boots, then the current boot, from the baseline."""
+    output = subprocess.check_output(
+        ["journalctl", "--list-boots", "--no-pager", "--utc"], text=True
+    )
+    baseline_epoch = int(BASELINE.timestamp())
+    total = 0
+    first_record = True
+    for line in output.splitlines()[1:]:
+        fields = line.split()
+        if len(fields) < 10:
+            continue
+        recorded_boot = fields[1]
+        if recorded_boot == current_boot:
+            continue
+        try:
+            start = int(
+                subprocess.check_output(
+                    ["date", "-d", " ".join(fields[3:6]), "+%s"], text=True
+                )
+            )
+            end = int(
+                subprocess.check_output(
+                    ["date", "-d", " ".join(fields[7:10]), "+%s"], text=True
+                )
+            )
+        except (IndexError, ValueError, subprocess.CalledProcessError):
+            continue
+        # The supplied commissioning time precedes the first retained journal
+        # entry in its initial boot. Count that unlogged boot-start interval as
+        # online instead of treating it as an outage.
+        effective_start = baseline_epoch if first_record else max(start, baseline_epoch)
+        total += max(0, end - effective_start)
+        first_record = False
+    total += max(0, now - max(current_boot_epoch, baseline_epoch))
+    return total
+
+
+def write_json(target: Path, value: dict) -> None:
+    with tempfile.NamedTemporaryFile("w", dir=STATE_DIR, delete=False) as handle:
+        json.dump(value, handle, sort_keys=True)
+        handle.write("\n")
+        temporary = handle.name
+    os.chmod(temporary, 0o644)
+    os.replace(temporary, target)
+
+
+def main() -> None:
+    STATE_DIR.mkdir(mode=0o755, parents=True, exist_ok=True)
+    now = int(time.time())
+    baseline_epoch = int(BASELINE.timestamp())
+    current_boot = boot_id()
+    current_boot_epoch = boot_epoch()
+
+    if STATE_FILE.exists():
+        state = json.loads(STATE_FILE.read_text())
+        online_seconds = int(state["online_seconds"])
+        previous_seen = int(state["last_seen_epoch"])
+        if state["boot_id"] == current_boot:
+            online_seconds += max(0, now - previous_seen)
+        else:
+            online_seconds += max(0, now - max(current_boot_epoch, baseline_epoch))
+    else:
+        online_seconds = journal_seed(now, current_boot, current_boot_epoch)
+
+    elapsed_seconds = max(0, now - baseline_epoch)
+    online_seconds = min(online_seconds, elapsed_seconds)
+    availability_ratio = online_seconds / elapsed_seconds if elapsed_seconds else 1.0
+    state = {
+        "baseline_epoch": baseline_epoch,
+        "boot_id": current_boot,
+        "last_seen_epoch": now,
+        "online_seconds": online_seconds,
+    }
+    status = {
+        "availability_display": f"{availability_ratio * 100:.3f}%",
+        "availability_ratio": availability_ratio,
+        "baseline": BASELINE.isoformat().replace("+00:00", "Z"),
+        "current_boot_seconds": max(0, now - current_boot_epoch),
+        "elapsed_seconds": elapsed_seconds,
+        "online_seconds": online_seconds,
+    }
+    write_json(STATE_FILE, state)
+    write_json(STATUS_FILE, status)
+
+
+if __name__ == "__main__":
+    main()

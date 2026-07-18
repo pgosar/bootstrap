@@ -1,0 +1,7 @@
+[Unit]
+Description=Update NAS availability ledger
+After=systemd-journald.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nas-uptime-ledger
