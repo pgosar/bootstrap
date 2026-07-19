@@ -6,6 +6,7 @@ import os
 import subprocess
 import tempfile
 import time
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -271,10 +272,36 @@ def recent_oom_incidents() -> list[dict]:
             message = str(entry.get("MESSAGE", ""))
             if "Memory cgroup out of memory" not in message:
                 continue
+            match = re.search(r"docker-([0-9a-f]{64})\.scope", message)
+            container = "Container"
+            if match:
+                lookup = subprocess.run(
+                    ["docker", "inspect", "--format", "{{.Name}}", match.group(1)],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                if lookup.returncode == 0 and lookup.stdout.strip():
+                    container = lookup.stdout.strip().removeprefix("/")
+            if container == "Container":
+                around_oom = subprocess.run(
+                    [
+                        "journalctl", "-u", "docker", "--since", f"@{int(entry.get('__REALTIME_TIMESTAMP', '0')) // 1_000_000}",
+                        "--until", f"@{int(entry.get('__REALTIME_TIMESTAMP', '0')) // 1_000_000 + 5}",
+                        "--no-pager",
+                    ],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                names = set(re.findall(r"\bep=([^\s]+)", around_oom.stdout))
+                if len(names) == 1:
+                    container = names.pop()
             incidents.append({
                 "kind": "container_oom",
                 "timestamp": int(entry.get("__REALTIME_TIMESTAMP", "0")) // 1_000_000,
-                "message": "Container memory limit triggered",
+                "message": f"{container} exceeded its container memory limit",
+                "container": container if container != "Container" else None,
             })
         except (ValueError, TypeError):
             continue
