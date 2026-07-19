@@ -2,7 +2,9 @@
 # Guarded snapraid sync wrapper
 set -euo pipefail
 
-THRESHOLD=50
+# Accommodate normal batch conversions/renames (notably photo-library repairs)
+# while still stopping a meaningful unexpected deletion set for review.
+THRESHOLD=250
 FORCE=false
 LOCK_FILE=/run/lock/snapraid-operation.lock
 
