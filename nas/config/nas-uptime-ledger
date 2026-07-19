@@ -16,6 +16,9 @@ BASELINE = datetime(2026, 7, 8, 0, 30, 59, tzinfo=timezone.utc)
 STATE_DIR = Path("/var/lib/nas-uptime")
 STATE_FILE = STATE_DIR / "state.json"
 STATUS_FILE = STATE_DIR / "status.json"
+DATA_POOL_PATH = Path("/data")
+DATA_POOL_SAMPLE_INTERVAL = 60 * 60
+DATA_POOL_HISTORY_RETENTION = 30 * 24 * 60 * 60
 
 
 def boot_id() -> str:
@@ -76,6 +79,31 @@ def write_json(target: Path, value: dict) -> None:
     os.replace(temporary, target)
 
 
+def data_pool_sample(now: int) -> dict:
+    stats = os.statvfs(DATA_POOL_PATH)
+    total_bytes = stats.f_blocks * stats.f_frsize
+    available_bytes = stats.f_bavail * stats.f_frsize
+    return {
+        "timestamp": now,
+        "total_bytes": total_bytes,
+        "available_bytes": available_bytes,
+        "used_bytes": total_bytes - available_bytes,
+    }
+
+
+def data_pool_history(state: dict, now: int) -> tuple[dict, list[dict]]:
+    cutoff = now - DATA_POOL_HISTORY_RETENTION
+    history = [
+        sample
+        for sample in state.get("data_pool_history", [])
+        if isinstance(sample, dict) and int(sample.get("timestamp", 0)) >= cutoff
+    ]
+    current = data_pool_sample(now)
+    if not history or now - int(history[-1]["timestamp"]) >= DATA_POOL_SAMPLE_INTERVAL:
+        history.append(current)
+    return current, history
+
+
 def main() -> None:
     STATE_DIR.mkdir(mode=0o755, parents=True, exist_ok=True)
     now = int(time.time())
@@ -83,8 +111,9 @@ def main() -> None:
     current_boot = boot_id()
     current_boot_epoch = boot_epoch()
 
-    if STATE_FILE.exists():
-        state = json.loads(STATE_FILE.read_text())
+    previous_state = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else {}
+    if previous_state:
+        state = previous_state
         online_seconds = int(state["online_seconds"])
         previous_seen = int(state["last_seen_epoch"])
         if state["boot_id"] == current_boot:
@@ -94,6 +123,8 @@ def main() -> None:
     else:
         online_seconds = journal_seed(now, current_boot, current_boot_epoch)
 
+    data_pool, history = data_pool_history(previous_state, now)
+
     elapsed_seconds = max(0, now - baseline_epoch)
     online_seconds = min(online_seconds, elapsed_seconds)
     availability_ratio = online_seconds / elapsed_seconds if elapsed_seconds else 1.0
@@ -102,6 +133,7 @@ def main() -> None:
         "boot_id": current_boot,
         "last_seen_epoch": now,
         "online_seconds": online_seconds,
+        "data_pool_history": history,
     }
     status = {
         "availability_display": f"{availability_ratio * 100:.3f}%",
@@ -110,6 +142,13 @@ def main() -> None:
         "current_boot_seconds": max(0, now - current_boot_epoch),
         "elapsed_seconds": elapsed_seconds,
         "online_seconds": online_seconds,
+        "data_pool": {
+            **data_pool,
+            "history": history,
+            "used_percent": round(data_pool["used_bytes"] / data_pool["total_bytes"] * 100, 3)
+            if data_pool["total_bytes"]
+            else 0,
+        },
     }
     write_json(STATE_FILE, state)
     write_json(STATUS_FILE, status)
