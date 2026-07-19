@@ -2,6 +2,7 @@ configure_operations_basics() {
   log "Phase: journald limits, shell reminders, and backup placeholders"
   ensure_dir "$(target_path /etc/systemd/journald.conf.d)"
   ensure_dir "$(target_path /etc/profile.d)"
+  ensure_dir "$(target_path /etc/NetworkManager/system-connections)"
   ensure_dir "$(target_path /etc/sysctl.d)"
   ensure_dir "$(target_path /etc/zsh)"
   ensure_dir "$(target_path /usr/local/sbin)"
@@ -15,8 +16,11 @@ configure_operations_basics() {
   copy_with_backup "$NAS_ROOT/config/systemd/nas-kernel-maintenance-reminder.timer" "$(target_path /etc/systemd/system/nas-kernel-maintenance-reminder.timer)"
   copy_with_backup "$NAS_ROOT/config/zsh/zshrc" "$(target_path /etc/zsh/zshrc)"
   copy_with_backup "$NAS_ROOT/config/sysctl/99-ipv4-only.conf" "$(target_path /etc/sysctl.d/99-ipv4-only.conf)"
+  copy_with_backup "$NAS_ROOT/config/network/nas-ipv4-ethernet.nmconnection" "$(target_path /etc/NetworkManager/system-connections/nas-ipv4-ethernet.nmconnection)"
+  run chmod 0600 "$(target_path /etc/NetworkManager/system-connections/nas-ipv4-ethernet.nmconnection)"
   if [[ "$APPLY" == true && "$TARGET_MODE" == "host" ]]; then
     target_run sysctl --system
+    target_run nmcli connection reload
   fi
   backup_file "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)"
   write_text "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)" \
@@ -264,6 +268,8 @@ configure_samba() {
 
 configure_tailscale() {
   log "Phase: SSH and Tailscale"
+  ensure_dir "$(target_path /etc/ssh/sshd_config.d)"
+  copy_with_backup "$NAS_ROOT/config/ssh/99-ipv4-only.conf" "$(target_path /etc/ssh/sshd_config.d/99-ipv4-only.conf)"
   warn "Tailscale auth keys are not stored in this repo."
   log "Manual next step after service enablement: sudo tailscale up"
 }

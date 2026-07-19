@@ -3,6 +3,8 @@
    server string = NAS
    security = user
    map to guest = Bad User
+   interfaces = 127.0.0.1 192.168.1.196
+   bind interfaces only = yes
    server min protocol = SMB2
    logging = systemd
    load printers = no

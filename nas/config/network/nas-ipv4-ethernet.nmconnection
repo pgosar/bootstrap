@@ -1,0 +1,12 @@
+[connection]
+id=NAS IPv4 Ethernet
+uuid=394bb650-a547-378e-8028-b40f57fecfab
+type=ethernet
+interface-name=enp4s0
+autoconnect=true
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=disabled
