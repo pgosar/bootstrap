@@ -2,6 +2,7 @@ configure_operations_basics() {
   log "Phase: journald limits, shell reminders, and backup placeholders"
   ensure_dir "$(target_path /etc/systemd/journald.conf.d)"
   ensure_dir "$(target_path /etc/profile.d)"
+  ensure_dir "$(target_path /etc/sysctl.d)"
   ensure_dir "$(target_path /etc/zsh)"
   ensure_dir "$(target_path /usr/local/sbin)"
   ensure_dir "$(target_path /var/lib/nas-secrets/locked)"
@@ -13,6 +14,10 @@ configure_operations_basics() {
   copy_with_backup "$NAS_ROOT/config/systemd/nas-kernel-maintenance-reminder.service" "$(target_path /etc/systemd/system/nas-kernel-maintenance-reminder.service)"
   copy_with_backup "$NAS_ROOT/config/systemd/nas-kernel-maintenance-reminder.timer" "$(target_path /etc/systemd/system/nas-kernel-maintenance-reminder.timer)"
   copy_with_backup "$NAS_ROOT/config/zsh/zshrc" "$(target_path /etc/zsh/zshrc)"
+  copy_with_backup "$NAS_ROOT/config/sysctl/99-ipv4-only.conf" "$(target_path /etc/sysctl.d/99-ipv4-only.conf)"
+  if [[ "$APPLY" == true && "$TARGET_MODE" == "host" ]]; then
+    target_run sysctl --system
+  fi
   backup_file "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)"
   write_text "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)" \
     "[Journal]"$'\n'"SystemMaxUse=$JOURNALD_SYSTEM_MAX_USE"$'\n'"RuntimeMaxUse=$JOURNALD_RUNTIME_MAX_USE"$'\n'"MaxRetentionSec=$JOURNALD_MAX_RETENTION_SEC"$'\n'
