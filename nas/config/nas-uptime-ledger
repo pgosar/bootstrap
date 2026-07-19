@@ -10,7 +10,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-BASELINE = datetime(2026, 7, 7, 23, 37, 58, tzinfo=timezone.utc)
+# The initial boot installed the NAS OS. Track availability from the first
+# normal boot immediately afterward.
+BASELINE = datetime(2026, 7, 8, 0, 30, 59, tzinfo=timezone.utc)
 STATE_DIR = Path("/var/lib/nas-uptime")
 STATE_FILE = STATE_DIR / "state.json"
 STATUS_FILE = STATE_DIR / "status.json"
