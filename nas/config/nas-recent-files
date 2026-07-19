@@ -19,7 +19,7 @@ make_manifest() {
   for root in $roots; do
     [ -d "$root" ] || continue
     find "$root" -xdev -type f -printf '%p\t%T@\t%s\n' 2>/dev/null || true
-  done | LC_ALL=C sort >"$output"
+  done | LC_ALL=C sort -t $'\t' -k1,1 >"$output"
 }
 
 make_immich_manifest() {
@@ -28,7 +28,7 @@ make_immich_manifest() {
   for root in /data/personal/Photos/immich/library/library /data/personal/Photos/immich/library/upload; do
     [ -d "$root" ] || continue
     find "$root" -xdev -type f \( -iname '*.avif' -o -iname '*.bmp' -o -iname '*.cr2' -o -iname '*.cr3' -o -iname '*.dng' -o -iname '*.gif' -o -iname '*.heic' -o -iname '*.heif' -o -iname '*.jpeg' -o -iname '*.jpg' -o -iname '*.nef' -o -iname '*.orf' -o -iname '*.png' -o -iname '*.raf' -o -iname '*.rw2' -o -iname '*.tif' -o -iname '*.tiff' -o -iname '*.webp' \) -printf '%p\t%T@\t%s\n' 2>/dev/null || true
-  done | LC_ALL=C sort >"$output"
+  done | LC_ALL=C sort -t $'\t' -k1,1 >"$output"
 }
 
 new_paths() {
@@ -37,7 +37,7 @@ new_paths() {
     : >"$output"
     return
   fi
-  comm -13 <(cut -f1 "$previous") <(cut -f1 "$current") >"$output"
+  LC_ALL=C comm -13 <(cut -f1 "$previous" | LC_ALL=C sort) <(cut -f1 "$current" | LC_ALL=C sort) >"$output"
 }
 
 format_items() {

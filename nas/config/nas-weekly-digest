@@ -41,7 +41,7 @@ make_manifest() {
   : >"$output"
   while IFS= read -r root; do
     find "$root" -xdev -type f -printf '%p\t%T@\t%s\n' 2>/dev/null || true
-  done < <(existing_roots "$roots") | LC_ALL=C sort >"$output"
+  done < <(existing_roots "$roots") | LC_ALL=C sort -t $'\t' -k1,1 >"$output"
 }
 
 new_paths() {
@@ -50,7 +50,7 @@ new_paths() {
     : >"$output"
     return 0
   fi
-  comm -13 <(cut -f1 "$previous") <(cut -f1 "$current") >"$output"
+  LC_ALL=C comm -13 <(cut -f1 "$previous" | LC_ALL=C sort) <(cut -f1 "$current" | LC_ALL=C sort) >"$output"
 }
 
 changed_paths() {
