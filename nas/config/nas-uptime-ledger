@@ -20,6 +20,9 @@ STATUS_FILE = STATE_DIR / "status.json"
 DATA_POOL_PATH = Path("/data")
 DATA_POOL_SAMPLE_INTERVAL = 60 * 60
 DATA_POOL_HISTORY_RETENTION = 30 * 24 * 60 * 60
+DATA_DISK_PATHS = {
+    f"disk{disk}": Path(f"/mnt/disk{disk}/pool") for disk in range(1, 4)
+}
 SNAPSHOT_ROOTS = [Path(f"/mnt/disk{disk}/snapshots") for disk in range(1, 4)]
 SNAPSHOT_TIMEZONE = ZoneInfo("America/Los_Angeles")
 
@@ -92,6 +95,48 @@ def data_pool_sample(now: int) -> dict:
         "available_bytes": available_bytes,
         "used_bytes": total_bytes - available_bytes,
     }
+
+
+def data_disk_samples(state: dict, now: int) -> tuple[list[dict], dict[str, list[dict]]]:
+    """Collect exact per-filesystem usage and retain hourly disk history."""
+    cutoff = now - DATA_POOL_HISTORY_RETENTION
+    stored_histories = state.get("data_disk_history", {})
+    if not isinstance(stored_histories, dict):
+        stored_histories = {}
+
+    disks = []
+    histories = {}
+    for disk_id, path in DATA_DISK_PATHS.items():
+        stats = os.statvfs(path)
+        total_bytes = stats.f_blocks * stats.f_frsize
+        available_bytes = stats.f_bavail * stats.f_frsize
+        current = {
+            "timestamp": now,
+            "total_bytes": total_bytes,
+            "available_bytes": available_bytes,
+            "used_bytes": total_bytes - available_bytes,
+        }
+        history = [
+            sample
+            for sample in stored_histories.get(disk_id, [])
+            if isinstance(sample, dict) and int(sample.get("timestamp", 0)) >= cutoff
+        ]
+        if not history or now - int(history[-1]["timestamp"]) >= DATA_POOL_SAMPLE_INTERVAL:
+            history.append(current)
+        histories[disk_id] = history
+        disks.append(
+            {
+                "id": disk_id,
+                "label": disk_id.replace("disk", "Disk "),
+                "path": str(path),
+                **current,
+                "history": history,
+                "used_percent": round(current["used_bytes"] / total_bytes * 100, 3)
+                if total_bytes
+                else 0,
+            }
+        )
+    return disks, histories
 
 
 def data_pool_history(state: dict, now: int) -> tuple[dict, list[dict]]:
@@ -170,6 +215,7 @@ def main() -> None:
         online_seconds = journal_seed(now, current_boot, current_boot_epoch)
 
     data_pool, history = data_pool_history(previous_state, now)
+    data_disks, disk_histories = data_disk_samples(previous_state, now)
     if not previous_state.get("data_pool_snapshot_backfilled") or len(history) <= 1:
         history = snapshot_backfill(data_pool, now) + history
 
@@ -182,6 +228,7 @@ def main() -> None:
         "last_seen_epoch": now,
         "online_seconds": online_seconds,
         "data_pool_history": history,
+        "data_disk_history": disk_histories,
         "data_pool_snapshot_backfilled": True,
     }
     status = {
@@ -198,6 +245,7 @@ def main() -> None:
             if data_pool["total_bytes"]
             else 0,
         },
+        "data_disks": data_disks,
     }
     write_json(STATE_FILE, state)
     write_json(STATUS_FILE, status)
