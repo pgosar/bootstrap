@@ -25,6 +25,11 @@ DATA_DISK_PATHS = {
 }
 SNAPSHOT_ROOTS = [Path(f"/mnt/disk{disk}/snapshots") for disk in range(1, 4)]
 SNAPSHOT_TIMEZONE = ZoneInfo("America/Los_Angeles")
+MAINTENANCE_UNITS = {
+    "btrbk": ("btrbk.service", "btrbk.timer"),
+    "snapraid_sync": ("snapraid-sync.service", "snapraid-sync.timer"),
+    "snapraid_scrub": ("snapraid-scrub.service", "snapraid-scrub.timer"),
+}
 
 
 def boot_id() -> str:
@@ -195,6 +200,101 @@ def snapshot_backfill(current: dict, now: int) -> list[dict]:
     ]
 
 
+def command_properties(command: list[str]) -> dict[str, str]:
+    completed = subprocess.run(command, text=True, capture_output=True, check=False)
+    if completed.returncode != 0:
+        return {}
+    return dict(line.split("=", 1) for line in completed.stdout.splitlines() if "=" in line)
+
+
+def host_pressure() -> dict:
+    values = {}
+    for line in Path("/proc/meminfo").read_text().splitlines():
+        key, raw = line.split(":", 1)
+        values[key] = int(raw.strip().split()[0]) * 1024
+    load_1, load_5, load_15 = (float(value) for value in Path("/proc/loadavg").read_text().split()[:3])
+    cpu_temperature = None
+    for zone in Path("/sys/class/thermal").glob("thermal_zone*"):
+        try:
+            if (zone / "type").read_text().strip() == "x86_pkg_temp":
+                cpu_temperature = round(int((zone / "temp").read_text().strip()) / 1000, 1)
+                break
+        except (OSError, ValueError):
+            continue
+    return {
+        "memory_total_bytes": values.get("MemTotal", 0),
+        "memory_available_bytes": values.get("MemAvailable", 0),
+        "swap_total_bytes": values.get("SwapTotal", 0),
+        "swap_used_bytes": max(0, values.get("SwapTotal", 0) - values.get("SwapFree", 0)),
+        "load_1": load_1,
+        "load_5": load_5,
+        "load_15": load_15,
+        "cpu_temperature_c": cpu_temperature,
+    }
+
+
+def maintenance_status() -> dict[str, dict]:
+    result = {}
+    for name, (service, timer) in MAINTENANCE_UNITS.items():
+        service_values = command_properties([
+            "systemctl", "show", service, "--no-pager",
+            "-p", "ActiveState", "-p", "Result", "-p", "ExecMainStatus", "-p", "StateChangeTimestamp",
+        ])
+        timer_values = command_properties([
+            "systemctl", "show", timer, "--no-pager",
+            "-p", "NextElapseUSecRealtime", "-p", "LastTriggerUSec",
+        ])
+        result[name] = {
+            "label": name.replace("_", " ").title(),
+            "service": service,
+            "state": service_values.get("ActiveState", "unknown"),
+            "result": service_values.get("Result", "unknown"),
+            "exit_status": service_values.get("ExecMainStatus", ""),
+            "changed_at": service_values.get("StateChangeTimestamp", ""),
+            "last_run": timer_values.get("LastTriggerUSec", ""),
+            "next_run": timer_values.get("NextElapseUSecRealtime", ""),
+        }
+    return result
+
+
+def recent_oom_incidents() -> list[dict]:
+    completed = subprocess.run(
+        ["journalctl", "-k", "--since", "-24 hours", "--no-pager", "--output=json"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    incidents = []
+    for line in completed.stdout.splitlines():
+        try:
+            entry = json.loads(line)
+            message = str(entry.get("MESSAGE", ""))
+            if "Memory cgroup out of memory" not in message:
+                continue
+            incidents.append({
+                "kind": "container_oom",
+                "timestamp": int(entry.get("__REALTIME_TIMESTAMP", "0")) // 1_000_000,
+                "message": "Container memory limit triggered",
+            })
+        except (ValueError, TypeError):
+            continue
+    return incidents[-12:]
+
+
+def incidents(maintenance: dict[str, dict]) -> list[dict]:
+    values = recent_oom_incidents()
+    for item in maintenance.values():
+        if item["state"] == "failed" or item["result"] not in {"success", ""}:
+            values.append({
+                "kind": "maintenance_failure",
+                "timestamp": 0,
+                "message": f'{item["label"]} failed (exit {item["exit_status"] or "unknown"})',
+                "service": item["service"],
+                "changed_at": item["changed_at"],
+            })
+    return values
+
+
 def main() -> None:
     STATE_DIR.mkdir(mode=0o755, parents=True, exist_ok=True)
     now = int(time.time())
@@ -216,6 +316,7 @@ def main() -> None:
 
     data_pool, history = data_pool_history(previous_state, now)
     data_disks, disk_histories = data_disk_samples(previous_state, now)
+    maintenance = maintenance_status()
     if not previous_state.get("data_pool_snapshot_backfilled") or len(history) <= 1:
         history = snapshot_backfill(data_pool, now) + history
 
@@ -246,6 +347,9 @@ def main() -> None:
             else 0,
         },
         "data_disks": data_disks,
+        "host": host_pressure(),
+        "maintenance": maintenance,
+        "incidents": incidents(maintenance),
     }
     write_json(STATE_FILE, state)
     write_json(STATUS_FILE, status)
