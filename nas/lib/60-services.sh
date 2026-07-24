@@ -10,6 +10,9 @@ configure_operations_basics() {
   run chown root:root "$(target_path /var/lib/nas-secrets/locked)"
   run chmod 0555 "$(target_path /var/lib/nas-secrets/locked)"
   copy_with_backup "$NAS_ROOT/config/profile.d/nas-kernel-reminder.sh" "$(target_path /etc/profile.d/nas-kernel-reminder.sh)"
+  copy_with_backup "$NAS_ROOT/config/nas-power-profile" "$(target_path /usr/local/sbin/nas-power-profile)"
+  run chmod 0755 "$(target_path /usr/local/sbin/nas-power-profile)"
+  copy_with_backup "$NAS_ROOT/config/systemd/nas-power-profile.service" "$(target_path /etc/systemd/system/nas-power-profile.service)"
   copy_with_backup "$NAS_ROOT/config/nas-kernel-maintenance-reminder" "$(target_path /usr/local/sbin/nas-kernel-maintenance-reminder)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-kernel-maintenance-reminder)"
   copy_with_backup "$NAS_ROOT/config/systemd/nas-kernel-maintenance-reminder.service" "$(target_path /etc/systemd/system/nas-kernel-maintenance-reminder.service)"
@@ -356,6 +359,7 @@ enable_services() {
     target_run systemctl enable btrbk.timer
   fi
   target_run systemctl enable nas-btrfs-scrub-disk1.timer nas-btrfs-scrub-disk2.timer nas-btrfs-scrub-disk3.timer
+  target_run systemctl enable nas-power-profile.service
   target_run systemctl enable nas-url-queue-notify.path
   if [[ "$SNAPPER_ENABLE" == "true" ]]; then
     target_run systemctl enable snapper-timeline.timer snapper-cleanup.timer

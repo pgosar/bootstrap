@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+for preference in /sys/devices/system/cpu/cpufreq/policy*/energy_performance_preference; do
+  [[ -e "$preference" ]] || continue
+  printf '%s' balance_power >"$preference"
+done

@@ -1,0 +1,11 @@
+[Unit]
+Description=Apply NAS power-efficient CPU runtime policy
+After=systemd-modules-load.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nas-power-profile
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
