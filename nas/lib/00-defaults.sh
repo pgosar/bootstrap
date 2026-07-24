@@ -25,6 +25,8 @@ PACMAN_PACKAGES=(
   smartmontools
   nvme-cli
   hdparm
+  powertop
+  turbostat
   lsscsi
   sg3_utils
   btrfs-progs
