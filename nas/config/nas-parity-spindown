@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+parity_disk=/dev/disk/by-id/ata-WDC_WD40EFZZ-68CPAN0_WD-WX12D165E9LY
+[[ -b "$parity_disk" ]] || {
+  echo "parity disk is unavailable: $parity_disk" >&2
+  exit 1
+}
+
+# 241 encodes a 30-minute idle timeout. SMART is configured not to wake
+# standby drives; SnapRAID activity wakes this disk only in its maintenance window.
+exec /usr/bin/hdparm -S 241 "$parity_disk"

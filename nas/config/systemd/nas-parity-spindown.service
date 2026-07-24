@@ -1,0 +1,12 @@
+[Unit]
+Description=Set the NAS parity disk standby timeout
+RequiresMountsFor=/mnt/parity
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nas-parity-spindown
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
