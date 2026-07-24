@@ -54,14 +54,6 @@
    create mask = 0660
    directory mask = 0770
 
-[appdata-bulk]
-   path = /data/appdata-bulk
-   browseable = yes
-   read only = no
-   valid users = @nas
-   create mask = 0660
-   directory mask = 0770
-
 [staging]
    path = /data/staging
    browseable = yes

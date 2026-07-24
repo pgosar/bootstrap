@@ -75,17 +75,18 @@ POOL_DIRECTORIES=(
   media
   personal
   replicas
+  # Versioned restore points and backup artifacts. SnapRAID protects this
+  # ordinary pool directory; offsite copies remain the durability boundary.
+  backups
   # Ciphertext only. The decrypted view is mounted manually at /data/secrets.
   .secrets-encrypted
 )
 
 # High-churn or independently managed data remains in nested subvolumes and is
-# excluded from SnapRAID and btrbk's protected-pool snapshot.
+# excluded from SnapRAID's protected-pool coverage.
 POOL_SUBVOLUMES=(
   staging
-  appdata-bulk
   docker
-  backups
 )
 
 APPLY=false

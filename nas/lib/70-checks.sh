@@ -363,7 +363,6 @@ check_common_pool_dirs() {
     "$MERGERFS_MOUNT/replicas" \
     "$MERGERFS_MOUNT/secrets" \
     "$MERGERFS_MOUNT/staging" \
-    "$MERGERFS_MOUNT/appdata-bulk" \
     "$MERGERFS_MOUNT/docker" \
     "$MERGERFS_MOUNT/backups" \
     "$DOCKER_COMPOSE_DIR" \
@@ -513,6 +512,7 @@ check_common_snapraid_btrbk_samba() {
     for path in torrents iso-mirror staging snapshots '#recycle'; do
       check_file_contains_literal "$snapraid_conf" "$path" "SnapRAID excludes $path"
     done
+    check_file_not_contains_literal "$snapraid_conf" "exclude /backups/" "SnapRAID protects backups"
     for idx in "${!DATA_DISK_LABELS[@]}"; do
       mountpoint="/mnt/disk$((idx + 1))"
       check_file_contains_literal "$snapraid_conf" "$mountpoint" "SnapRAID references $mountpoint"

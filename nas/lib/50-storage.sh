@@ -37,6 +37,8 @@ configure_data_disk() {
     run chown "$PUID:$PGID" "$active_mountpoint/pool/$directory"
     if [[ "$directory" == .secrets-encrypted ]]; then
       run chmod 0700 "$active_mountpoint/pool/$directory"
+    elif [[ "$directory" == personal || "$directory" == backups ]]; then
+      run chmod 2770 "$active_mountpoint/pool/$directory"
     else
       run chmod 0775 "$active_mountpoint/pool/$directory"
     fi

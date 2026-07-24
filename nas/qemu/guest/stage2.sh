@@ -121,7 +121,6 @@ expected_dirs="$(mktemp)"
 actual_dirs="$(mktemp)"
 cat >"$expected_dirs" <<'EOF'
 /data/.secrets-encrypted
-/data/appdata-bulk
 /data/backups
 /data/docker
 /data/media
@@ -142,14 +141,14 @@ log "per-disk btrfs subvolumes"
 for d in /mnt/disk1 /mnt/disk2 /mnt/disk3; do
   echo "== $d =="
   btrfs subvolume list "$d" | grep 'pool/'
-  for directory in media personal replicas .secrets-encrypted; do
+  for directory in media personal replicas backups .secrets-encrypted; do
     [ -d "$d/pool/$directory" ]
     if btrfs subvolume show "$d/pool/$directory" >/dev/null 2>&1; then
       echo "ERROR: $d/pool/$directory must be an ordinary protected directory"
       exit 1
     fi
   done
-  for subvol in staging appdata-bulk docker backups; do
+  for subvol in staging docker; do
     btrfs subvolume show "$d/pool/$subvol" >/dev/null
   done
   [ -L "$d/pool/secrets" ] && [ "$(readlink "$d/pool/secrets")" = /var/lib/nas-secrets/locked ]

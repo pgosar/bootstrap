@@ -62,4 +62,7 @@ if [[ "$removed_count" -gt "$THRESHOLD" ]]; then
 fi
 
 echo "Running snapraid sync..."
-exec snapraid sync
+# Docker backup fragments can contain same-name, same-size, same-timestamp
+# database files with different contents on separate mergerfs branches. Disable
+# copy detection so SnapRAID hashes each file instead of assuming they match.
+exec snapraid --force-nocopy sync

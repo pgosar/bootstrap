@@ -10,7 +10,7 @@ lockfile                /run/lock/btrbk.lock
 volume /mnt/disk1
   snapshot_dir snapshots
 
-  # pool contains the parity-protected media, personal, replicas, and
+  # pool contains the parity-protected media, personal, replicas, backups, and
   # encrypted-secrets directories as ordinary directories.
   subvolume pool
 
@@ -20,7 +20,7 @@ volume /mnt/disk1
 volume /mnt/disk2
   snapshot_dir snapshots
 
-  # pool contains the parity-protected media, personal, replicas, and
+  # pool contains the parity-protected media, personal, replicas, backups, and
   # encrypted-secrets directories as ordinary directories.
   subvolume pool
 
@@ -30,12 +30,12 @@ volume /mnt/disk2
 volume /mnt/disk3
   snapshot_dir snapshots
 
-  # pool contains the parity-protected media, personal, replicas, and
+  # pool contains the parity-protected media, personal, replicas, backups, and
   # encrypted-secrets directories as ordinary directories.
   subvolume pool
 
   # Docker remains an independently managed nested subvolume.
   subvolume pool/docker
 
-# Docker is snapshotted independently. Staging, downloads, appdata-bulk, and
-# backups remain nested subvolumes and are intentionally omitted from btrbk.
+# Docker is snapshotted independently. Staging remains a nested subvolume and
+# is intentionally omitted from btrbk.
