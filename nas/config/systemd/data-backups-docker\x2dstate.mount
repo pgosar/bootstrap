@@ -1,0 +1,13 @@
+[Unit]
+Description=Expose the Docker state backup union under /data/backups
+Requires=mnt-docker\x2dstate\x2dbackup.mount
+After=data.mount mnt-docker\x2dstate\x2dbackup.mount
+
+[Mount]
+What=/mnt/docker-state-backup
+Where=/data/backups/docker-state
+Type=none
+Options=bind,ro
+
+[Install]
+WantedBy=local-fs.target

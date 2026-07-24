@@ -6,6 +6,8 @@ configure_operations_basics() {
   ensure_dir "$(target_path /etc/sysctl.d)"
   ensure_dir "$(target_path /etc/zsh)"
   ensure_dir "$(target_path /usr/local/sbin)"
+  ensure_dir "$(target_path /mnt/docker-state-backup)"
+  ensure_dir "$(target_path "$MERGERFS_MOUNT/backups/docker-state")"
   ensure_dir "$(target_path /var/lib/nas-secrets/locked)"
   run chown root:root "$(target_path /var/lib/nas-secrets/locked)"
   run chmod 0555 "$(target_path /var/lib/nas-secrets/locked)"
@@ -210,8 +212,11 @@ configure_snapraid() {
 configure_btrbk() {
   log "Phase: btrbk config and timer"
   copy_with_backup "$NAS_ROOT/config/btrbk.conf.example" "$(target_path /etc/btrbk/btrbk.conf)"
+  ensure_dir "$(target_path /usr/local/sbin)"
+  copy_with_backup "$NAS_ROOT/config/nas-docker-state-backup" "$(target_path /usr/local/sbin/nas-docker-state-backup)"
+  run chmod 0755 "$(target_path /usr/local/sbin/nas-docker-state-backup)"
   local unit
-  for unit in btrbk.service btrbk.timer; do
+  for unit in btrbk.service btrbk.timer nas-docker-state-backup.service nas-docker-state-backup.timer 'mnt-docker\x2dstate\x2dbackup.mount' 'data-backups-docker\x2dstate.mount'; do
     copy_with_backup "$NAS_ROOT/config/systemd/$unit" "$(target_path "/etc/systemd/system/$unit")"
   done
 }
@@ -359,7 +364,7 @@ enable_services() {
     target_run systemctl enable snapraid-sync.timer snapraid-scrub.timer
   fi
   if [[ "$BTRBK_ENABLE" == "true" ]]; then
-    target_run systemctl enable btrbk.timer
+    target_run systemctl enable btrbk.timer nas-docker-state-backup.timer 'mnt-docker\x2dstate\x2dbackup.mount' 'data-backups-docker\x2dstate.mount'
   fi
   target_run systemctl enable nas-btrfs-scrub-disk1.timer nas-btrfs-scrub-disk2.timer nas-btrfs-scrub-disk3.timer
   target_run systemctl enable nas-power-profile.service

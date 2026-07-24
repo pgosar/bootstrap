@@ -1,0 +1,13 @@
+[Unit]
+Description=Read-only union view of the current Docker state backup
+RequiresMountsFor=/mnt/disk1 /mnt/disk2 /mnt/disk3
+After=local-fs.target
+
+[Mount]
+What=/mnt/disk2/pool/backups/docker-state/disk1:/mnt/disk3/pool/backups/docker-state/disk2:/mnt/disk1/pool/backups/docker-state/disk3
+Where=/mnt/docker-state-backup
+Type=mergerfs
+Options=defaults,ro,cache.files=off,use_ino
+
+[Install]
+WantedBy=local-fs.target

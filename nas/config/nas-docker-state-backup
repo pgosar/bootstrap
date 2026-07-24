@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Create cross-disk, versioned replicas of the latest Docker Btrfs snapshots.
+set -euo pipefail
+
+LOCK_FILE=/run/lock/snapraid-operation.lock
+
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  echo "Docker-state backup skipped: SnapRAID or a Btrfs scrub is active."
+  exit 0
+fi
+
+# A fresh immutable source avoids copying active SQLite/Postgres files directly.
+btrbk -c /etc/btrbk/btrbk.conf run
+
+latest_snapshot() {
+  find "$1" -mindepth 1 -maxdepth 1 -type d -name 'docker.*' -printf '%T@ %p\n' |
+    sort -n | tail -n 1 | cut -d' ' -f2-
+}
+
+backup_disk() {
+  local source_disk="$1" target_disk="$2" source snapshot root next current previous
+  source="/mnt/disk${source_disk}/snapshots"
+  snapshot="$(latest_snapshot "$source")"
+  [[ -n "$snapshot" ]] || { echo "No Docker snapshot found on disk${source_disk}" >&2; return 1; }
+
+  root="/mnt/disk${target_disk}/pool/backups/docker-state/disk${source_disk}"
+  next="$root/.next"
+  current="$root/current"
+  previous="$root/.previous"
+  install -d -o chilly -g nas -m 2770 "$root"
+  rm -rf -- "$next" "$previous"
+  install -d -o chilly -g nas -m 2770 "$next"
+  ionice -c 3 nice -n 10 rsync -aHAX --numeric-ids --delete --exclude='ipc-socket' "$snapshot/" "$next/"
+  printf 'source_disk=disk%s\nsource_snapshot=%s\ncreated_at=%s\n' \
+    "$source_disk" "$snapshot" "$(date -u +%FT%TZ)" >"$next/MANIFEST"
+  chown -R chilly:nas "$next"
+  [[ ! -d "$current" ]] || mv -- "$current" "$previous"
+  mv -- "$next" "$current"
+  rm -rf -- "$previous"
+  echo "Backed up disk${source_disk} Docker state to $current"
+}
+
+# Never write a source disk's Docker state back to that same physical disk.
+backup_disk 1 2
+backup_disk 2 3
+backup_disk 3 1

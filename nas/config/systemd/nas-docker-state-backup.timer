@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Docker state backup every six hours
+
+[Timer]
+# Leaves at least 15 minutes after the overnight SnapRAID sync window and
+# avoids the Sunday 00:30 scrub window.
+OnCalendar=*-*-* 03,09,15,21:00:00
+Persistent=true
+AccuracySec=1m
+
+[Install]
+WantedBy=timers.target
