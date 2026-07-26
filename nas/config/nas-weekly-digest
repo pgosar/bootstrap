@@ -360,7 +360,6 @@ critical_alerts="$tmp_dir/critical.alerts"
 : >"$critical_alerts"
 [ "$smartd_error_count" -gt 0 ] && printf 'SMARTD: %s alert/error lines in the last 7 days\n' "$smartd_error_count" >>"$critical_alerts"
 [ "$backup_failure_count" -gt 0 ] && printf 'BACKUP/PARITY: %s failed service result(s)\n' "$backup_failure_count" >>"$critical_alerts"
-[ "$docker_log_error_count" -gt 0 ] && printf 'DOCKER LOGS: %s error-like line(s) across running containers\n' "$docker_log_error_count" >>"$critical_alerts"
 [ "$oom_count" -gt 0 ] && printf 'KERNEL: %s OOM/killed-process line(s)\n' "$oom_count" >>"$critical_alerts"
 [ "$failed_unit_count" -gt 0 ] && printf 'SYSTEMD: %s unit(s) currently failed\n' "$failed_unit_count" >>"$critical_alerts"
 [ "$disk_low_free_count" -gt 0 ] && printf 'STORAGE: %s disk(s) below the 100 GiB mergerfs minimum-free threshold\n' "$disk_low_free_count" >>"$critical_alerts"
@@ -368,13 +367,30 @@ critical_alerts="$tmp_dir/critical.alerts"
 [ "$btrfs_scrub_error_count" -gt 0 ] && printf 'BTRFS: scrub status needs attention on %s disk(s)\n' "$btrfs_scrub_error_count" >>"$critical_alerts"
 critical_count="$(wc -l <"$critical_alerts")"
 
+review_count=$((docker_bad_count + docker_log_error_count + excluded_count))
+if [ "$critical_count" -gt 0 ]; then
+  status="🚨 **Needs attention — $critical_count critical check(s)**"
+elif [ "$review_count" -gt 0 ]; then
+  status="⚠️ **Review recommended — $review_count non-critical signal(s)**"
+else
+  status="✅ **All scheduled checks look healthy**"
+fi
+
 summary="$(cat <<EOF
-📊 NAS WEEKLY DIGEST ($(date +%Y-%m-%d))
-Changes: photos +$photos_count | intake +$inbox_count (pending $pending_count) | media +$recent_media | ISOs +$recent_isos | Personal +$recent_personal | Immich images +$recent_immich_images
-Health: Docker not-Up $docker_bad_count | Docker log errors $docker_log_error_count | journal priority 0-3 $journal_error_count | disk imbalance ${disk_imbalance_gib} GiB
-Protection: SnapRAID exclusions with files $excluded_count | secrets $secrets_state
-Storage: Btrfs usage and parity capacity are in the local report
-Full report: $report
+📊 **NAS weekly update** · $(date +%Y-%m-%d)
+$status
+
+**Activity**
+• Photos: +$photos_count
+• Intake: +$inbox_count ($pending_count currently pending)
+• Recent additions: media +$recent_media · ISOs +$recent_isos · personal +$recent_personal · Immich +$recent_immich_images
+
+**Operations**
+• Docker: $docker_bad_count not running · $docker_log_error_count log signal(s)
+• Storage: $disk_low_free_count low-space alert(s) · ${disk_imbalance_gib} GiB disk imbalance
+• Protection: $backup_failure_count backup/parity failure(s) · $btrfs_scrub_error_count scrub issue(s)
+
+📄 Full report: $report
 EOF
 )"
 if [ "$baseline" = "yes" ]; then
@@ -391,12 +407,4 @@ else
     /usr/local/sbin/nas-notify weekly-digest $'🚨 **CRITICAL NAS ALERTS**\n'"$(cat "$critical_alerts")"
   fi
   /usr/local/sbin/nas-notify weekly-digest "$summary"
-fi
-if [ "$critical_count" -gt 0 ] || [ "$photos_count" -gt 0 ] || [ "$inbox_count" -gt 0 ] || [ "$appdata_count" -gt 0 ] || [ "$docker_bad_count" -gt 0 ] || [ "$excluded_count" -gt 0 ] || [ "$recent_total" -gt 0 ]; then
-  details="$(sed -n '1,70p' "$report")"
-  if [ "$NO_NOTIFY" = "true" ]; then
-    printf 'Details:\n%s\n' "$details"
-  else
-    /usr/local/sbin/nas-notify weekly-digest $'Details:\n'"$details"
-  fi
 fi
