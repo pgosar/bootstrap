@@ -26,6 +26,9 @@ DATA_DISK_PATHS = {
 }
 SNAPSHOT_ROOTS = [Path(f"/mnt/disk{disk}/snapshots") for disk in range(1, 4)]
 SNAPSHOT_TIMEZONE = ZoneInfo("America/Los_Angeles")
+PARITY_DISK = Path("/dev/disk/by-id/ata-WDC_WD40EFZZ-68CPAN0_WD-WX12D165E9LY")
+PARITY_STANDBY_TIMEOUT_MINUTES = 30
+PARITY_SPINDOWN_SERVICE = "nas-parity-spindown.service"
 MAINTENANCE_UNITS = {
     "btrbk": ("btrbk.service", "btrbk.timer"),
     "snapraid_sync": ("snapraid-sync.service", "snapraid-sync.timer"),
@@ -258,6 +261,32 @@ def maintenance_status() -> dict[str, dict]:
     return result
 
 
+def parity_disk_status() -> dict[str, str | int]:
+    """Return the parity HDD power state without waking the drive."""
+    completed = subprocess.run(
+        ["hdparm", "-C", str(PARITY_DISK)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    state = "unknown"
+    if completed.returncode == 0:
+        match = re.search(r"drive state is:\s*(.+)", completed.stdout, re.IGNORECASE)
+        if match:
+            state = match.group(1).strip().lower()
+
+    service_values = command_properties([
+        "systemctl", "show", PARITY_SPINDOWN_SERVICE, "--no-pager",
+        "-p", "ActiveState", "-p", "Result",
+    ])
+    return {
+        "state": state,
+        "standby_timeout_minutes": PARITY_STANDBY_TIMEOUT_MINUTES,
+        "spindown_service_state": service_values.get("ActiveState", "unknown"),
+        "spindown_service_result": service_values.get("Result", "unknown"),
+    }
+
+
 def recent_oom_incidents() -> list[dict]:
     completed = subprocess.run(
         ["journalctl", "-k", "--since", "-24 hours", "--no-pager", "--output=json"],
@@ -344,6 +373,7 @@ def main() -> None:
     data_pool, history = data_pool_history(previous_state, now)
     data_disks, disk_histories = data_disk_samples(previous_state, now)
     maintenance = maintenance_status()
+    parity_disk = parity_disk_status()
     if not previous_state.get("data_pool_snapshot_backfilled") or len(history) <= 1:
         history = snapshot_backfill(data_pool, now) + history
 
@@ -376,6 +406,7 @@ def main() -> None:
         "data_disks": data_disks,
         "host": host_pressure(),
         "maintenance": maintenance,
+        "parity_disk": parity_disk,
         "incidents": incidents(maintenance),
     }
     write_json(STATE_FILE, state)
