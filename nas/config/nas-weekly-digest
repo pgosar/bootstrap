@@ -245,7 +245,9 @@ journalctl --since '7 days ago' -p 0..3 -q -o json 2>/dev/null |
 journal_error_count="$(journalctl --since '7 days ago' -p 0..3 -q --no-pager 2>/dev/null | wc -l || true)"
 smartd_error_count="$(journalctl -u smartd.service --since '7 days ago' -q --no-pager 2>/dev/null |
   grep -Ei 'smart|self-test' |
-  grep -Eiv 'not found in smartd database|changed from|enabled|opened|is smart capable|monitoring|started' |
+  # SMARTD reports successful scheduled self-tests as "completed without error".
+  # Exclude those normal lifecycle messages before looking for actual faults.
+  grep -Eiv 'not found in smartd database|changed from|enabled|opened|is smart capable|monitoring|started|starting scheduled .*self-test|self-test completed without error|previous .*self-test completed without error' |
   grep -Eic 'error|fail|critical|warning|alert' || true)"
 oom_count="$(journalctl -k --since '7 days ago' -q --no-pager 2>/dev/null | grep -Eci 'out of memory|killed process' || true)"
 failed_units="$tmp_dir/failed.units"
