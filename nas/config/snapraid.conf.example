@@ -31,5 +31,8 @@ exclude #recycle/
 exclude docker/appdata/*/cache/
 exclude docker/appdata/*/transcode/
 
-# Timer sync is managed via a guarded wrapper script (/usr/local/bin/snapraid-sync.sh)
-# which refuses syncs with large delete counts (>50) unless run with --force.
+# Timer sync is managed via a guarded wrapper script (/usr/local/bin/snapraid-sync.sh).
+# Rotating `backups/docker-state/*/current/` replica files remain protected but
+# are excluded from the wrapper's deletion threshold calculation.
+# which refuses syncs with more than 250 non-replica deletions unless run with
+# --force.

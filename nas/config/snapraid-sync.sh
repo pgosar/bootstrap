@@ -48,13 +48,20 @@ if [[ -z "$removed_count" ]]; then
     fi
 fi
 
-echo "Files to be removed: $removed_count"
+# The cross-disk Docker-state backup atomically replaces its `current` copies.
+# Those replicas remain parity-protected, but their expected cache/log/database
+# rotation must not mask a large removal elsewhere in the protected pool.
+docker_state_removed_count="$(printf '%s\n' "$diff_out" |
+    awk '/^remove[[:space:]]+backups\/docker-state\/[^/]+\/current\// {count++} END {print count + 0}')"
+guard_removed_count=$((removed_count - docker_state_removed_count))
 
-if [[ "$removed_count" -gt "$THRESHOLD" ]]; then
+echo "Files to be removed: $removed_count ($docker_state_removed_count expected Docker-state replica churn; $guard_removed_count subject to safety threshold)"
+
+if [[ "$guard_removed_count" -gt "$THRESHOLD" ]]; then
     if [[ "$FORCE" == "true" ]]; then
-        echo "Warning: Deletion count ($removed_count) exceeds threshold ($THRESHOLD), but force is enabled. Proceeding with sync..."
+        echo "Warning: Guarded deletion count ($guard_removed_count) exceeds threshold ($THRESHOLD), but force is enabled. Proceeding with sync..."
     else
-        echo "ERROR: Deletion count ($removed_count) exceeds safety threshold ($THRESHOLD)!"
+        echo "ERROR: Guarded deletion count ($guard_removed_count) exceeds safety threshold ($THRESHOLD)!"
         echo "Sync aborted to prevent accidental data loss."
         echo "Run manually with '--force' or '-f' if this deletion is intentional."
         exit 2
