@@ -34,6 +34,8 @@ MAINTENANCE_UNITS = {
     "snapraid_sync": ("snapraid-sync.service", "snapraid-sync.timer"),
     "snapraid_scrub": ("snapraid-scrub.service", "snapraid-scrub.timer"),
 }
+BACKUP_COPIES = (("disk1", "disk2"), ("disk2", "disk3"), ("disk3", "disk1"))
+INTERNET_PROBE_URL = "https://1.1.1.1/"
 
 
 def boot_id() -> str:
@@ -261,6 +263,77 @@ def maintenance_status() -> dict[str, dict]:
     return result
 
 
+def backup_status(now: int) -> dict:
+    """Report the three cross-disk Docker-state replicas from their manifests."""
+    copies = []
+    ages = []
+    for source, target in BACKUP_COPIES:
+        manifest = Path(f"/mnt/{target}/pool/backups/docker-state/{source}/current/MANIFEST")
+        copy = {"source": source, "target": target}
+        try:
+            fields = {}
+            for line in manifest.read_text().splitlines():
+                key, separator, value = line.partition("=")
+                if separator:
+                    fields[key] = value
+            created_at = fields["created_at"]
+            created_epoch = int(datetime.fromisoformat(created_at.replace("Z", "+00:00")).timestamp())
+            if fields.get("source_disk") != source or created_epoch > now + 300:
+                raise ValueError("invalid manifest")
+            copy["created_at"] = created_at
+            ages.append(max(0, now - created_epoch))
+        except (OSError, KeyError, ValueError):
+            copy["error"] = "Backup manifest unavailable"
+        copies.append(copy)
+    return {
+        "copies": copies,
+        "complete": len(ages) == len(BACKUP_COPIES),
+        "oldest_age_seconds": max(ages) if ages else None,
+    }
+
+
+def connectivity_status() -> dict:
+    """Run bounded host connectivity probes without exposing tailnet credentials."""
+    internet = {"reachable": False, "latency_ms": None}
+    try:
+        completed = subprocess.run(
+            ["curl", "--fail", "--silent", "--show-error", "--output", "/dev/null",
+             "--write-out", "%{time_total}", "--connect-timeout", "3", "--max-time", "6",
+             INTERNET_PROBE_URL],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if completed.returncode == 0:
+            internet = {
+                "reachable": True,
+                "latency_ms": round(float(completed.stdout.strip()) * 1000),
+            }
+    except (OSError, ValueError):
+        pass
+
+    tailscale = {"reachable": False, "backend_state": "unknown"}
+    try:
+        completed = subprocess.run(
+            ["tailscale", "status", "--json"], text=True, capture_output=True, check=False, timeout=6
+        )
+        if completed.returncode == 0:
+            value = json.loads(completed.stdout)
+            self_status = value.get("Self", {})
+            ips = self_status.get("TailscaleIPs", [])
+            ipv4 = next((ip for ip in ips if isinstance(ip, str) and ":" not in ip), None)
+            backend_state = value.get("BackendState", "unknown")
+            tailscale = {
+                "reachable": backend_state == "Running" and self_status.get("Online") is True,
+                "backend_state": backend_state,
+                "hostname": self_status.get("HostName"),
+                "ip": ipv4,
+            }
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        pass
+    return {"internet": internet, "tailscale": tailscale}
+
+
 def parity_disk_status() -> dict[str, str | int]:
     """Return the parity HDD power state without waking the drive."""
     completed = subprocess.run(
@@ -374,6 +447,8 @@ def main() -> None:
     data_disks, disk_histories = data_disk_samples(previous_state, now)
     maintenance = maintenance_status()
     parity_disk = parity_disk_status()
+    backup = backup_status(now)
+    connectivity = connectivity_status()
     if not previous_state.get("data_pool_snapshot_backfilled") or len(history) <= 1:
         history = snapshot_backfill(data_pool, now) + history
 
@@ -390,6 +465,7 @@ def main() -> None:
         "data_pool_snapshot_backfilled": True,
     }
     status = {
+        "generated_at": datetime.fromtimestamp(now, timezone.utc).isoformat().replace("+00:00", "Z"),
         "availability_display": f"{availability_ratio * 100:.3f}%",
         "availability_ratio": availability_ratio,
         "baseline": BASELINE.isoformat().replace("+00:00", "Z"),
@@ -407,6 +483,8 @@ def main() -> None:
         "host": host_pressure(),
         "maintenance": maintenance,
         "parity_disk": parity_disk,
+        "backup": backup,
+        "connectivity": connectivity,
         "incidents": incidents(maintenance),
     }
     write_json(STATE_FILE, state)
