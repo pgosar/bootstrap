@@ -83,4 +83,7 @@ chmod 0644 "$tmp_status"
 mv -f -- "$tmp_state" "$STATE_FILE"
 mv -f -- "$tmp_status" "$STATUS_FILE"
 
-[[ ! -s "$tmp_errors" ]]
+# Registry failures are first-class monitor results recorded above, not script
+# failures. Reserve a nonzero service result for an unexpected script or
+# notification failure so routine throttling does not poison systemd health.
+exit 0
