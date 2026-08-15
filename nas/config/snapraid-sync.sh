@@ -6,7 +6,9 @@ set -euo pipefail
 # while still stopping a meaningful unexpected deletion set for review.
 THRESHOLD=250
 FORCE=false
-LOCK_FILE=/run/lock/snapraid-operation.lock
+FORCE_ZERO=false
+LOCK_FILE=${SNAPRAID_LOCK_FILE:-/run/lock/snapraid-operation.lock}
+SNAPRAID_CONF=${SNAPRAID_CONF:-/etc/snapraid.conf}
 
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
@@ -20,6 +22,8 @@ fi
 for arg in "$@"; do
     if [[ "$arg" == "--force" || "$arg" == "-f" ]]; then
         FORCE=true
+    elif [[ "$arg" == "--force-zero" || "$arg" == "-Z" ]]; then
+        FORCE_ZERO=true
     fi
 done
 
@@ -68,8 +72,60 @@ if [[ "$guard_removed_count" -gt "$THRESHOLD" ]]; then
     fi
 fi
 
+mapfile -t data_roots < <(
+    awk '$1 == "data" {print $3}' "$SNAPRAID_CONF"
+)
+
+if [[ "${#data_roots[@]}" -eq 0 ]]; then
+    echo "ERROR: Could not find any SnapRAID data roots in $SNAPRAID_CONF."
+    exit 1
+fi
+
+# PostgreSQL and other application databases can legitimately truncate files to
+# zero bytes. The cross-disk backup preserves those files in an atomically
+# replaced `current` replica, but SnapRAID requires --force-zero before it will
+# record a nonzero-to-zero transition. Automatically allow that transition only
+# inside these stable Docker-state replicas; keep the normal safety stop for
+# every other protected path.
+zero_update_paths=()
+unsafe_zero_update_paths=()
+while IFS= read -r relative_path; do
+    [[ -n "$relative_path" ]] || continue
+
+    for data_root in "${data_roots[@]}"; do
+        candidate="${data_root%/}/$relative_path"
+        if [[ -f "$candidate" && ! -s "$candidate" ]]; then
+            zero_update_paths+=("$relative_path")
+            if [[ ! "$relative_path" =~ ^backups/docker-state/[^/]+/current/ ]]; then
+                unsafe_zero_update_paths+=("$relative_path")
+            fi
+            break
+        fi
+    done
+done < <(printf '%s\n' "$diff_out" | sed -n 's/^update[[:space:]]\+//p')
+
+if [[ "${#unsafe_zero_update_paths[@]}" -gt 0 && "$FORCE_ZERO" != "true" ]]; then
+    echo "ERROR: Refusing to sync unexpected zero-byte updates outside Docker-state current replicas:"
+    printf '  %s\n' "${unsafe_zero_update_paths[@]}"
+    echo "Review these files, then rerun with '--force-zero' or '-Z' only if the changes are intentional."
+    exit 4
+fi
+
+if [[ "${#zero_update_paths[@]}" -gt 0 ]]; then
+    if [[ "${#unsafe_zero_update_paths[@]}" -eq 0 ]]; then
+        echo "Allowing ${#zero_update_paths[@]} expected zero-byte Docker-state replica update(s)."
+    else
+        echo "Warning: Explicitly allowing ${#zero_update_paths[@]} reviewed zero-byte update(s)."
+    fi
+    FORCE_ZERO=true
+fi
+
 echo "Running snapraid sync..."
 # Docker backup fragments can contain same-name, same-size, same-timestamp
 # database files with different contents on separate mergerfs branches. Disable
 # copy detection so SnapRAID hashes each file instead of assuming they match.
-exec snapraid --force-nocopy sync
+sync_args=(--force-nocopy)
+if [[ "$FORCE_ZERO" == "true" ]]; then
+    sync_args+=(--force-zero)
+fi
+exec snapraid "${sync_args[@]}" sync

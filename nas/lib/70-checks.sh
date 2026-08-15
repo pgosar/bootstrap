@@ -555,6 +555,8 @@ check_common_snapraid_btrbk_samba() {
     check_unit_enabled snapraid-sync.timer true
     check_unit_enabled snapraid-scrub.timer true
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-sync.sh)" "/run/lock/snapraid-operation.lock" "SnapRAID sync uses the shared operation lock"
+    check_file_contains_literal "$(target_path /usr/local/bin/snapraid-sync.sh)" "^backups/docker-state/[^/]+/current/" "SnapRAID sync scopes automatic zero-byte handling to Docker-state replicas"
+    check_file_contains_literal "$(target_path /usr/local/bin/snapraid-sync.sh)" "sync_args+=(--force-zero)" "SnapRAID sync supports reviewed zero-byte transitions"
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-scrub.sh)" "/run/lock/snapraid-operation.lock" "SnapRAID scrub uses the shared operation lock"
     check_file_contains_literal "$(target_path /etc/systemd/system/snapraid-sync.timer)" "OnCalendar=Mon..Sat *-*-* 02:15:00" "overnight SnapRAID sync avoids Sunday scrub"
     check_file_contains_literal "$(target_path /etc/systemd/system/snapraid-scrub.timer)" "OnCalendar=Sun 00:30" "SnapRAID scrub owns early Sunday"
