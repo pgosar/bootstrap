@@ -245,6 +245,7 @@ def maintenance_status() -> dict[str, dict]:
         service_values = command_properties([
             "systemctl", "show", service, "--no-pager",
             "-p", "ActiveState", "-p", "Result", "-p", "ExecMainStatus", "-p", "StateChangeTimestamp",
+            "-p", "ExecMainStartTimestamp",
         ])
         timer_values = command_properties([
             "systemctl", "show", timer, "--no-pager",
@@ -257,7 +258,7 @@ def maintenance_status() -> dict[str, dict]:
             "result": service_values.get("Result", "unknown"),
             "exit_status": service_values.get("ExecMainStatus", ""),
             "changed_at": service_values.get("StateChangeTimestamp", ""),
-            "last_run": timer_values.get("LastTriggerUSec", ""),
+            "last_run": service_values.get("ExecMainStartTimestamp", "") or timer_values.get("LastTriggerUSec", ""),
             "next_run": timer_values.get("NextElapseUSecRealtime", ""),
         }
     return result
