@@ -33,7 +33,9 @@ MAINTENANCE_UNITS = {
     "btrbk": ("btrbk.service", "btrbk.timer"),
     "snapraid_sync": ("snapraid-sync.service", "snapraid-sync.timer"),
     "snapraid_scrub": ("snapraid-scrub.service", "snapraid-scrub.timer"),
+    "container_images": ("nas-container-image-monitor.service", "nas-container-image-monitor.timer"),
 }
+IMAGE_UPDATE_STATUS_FILE = Path("/var/lib/nas-container-image-monitor/status.json")
 BACKUP_COPIES = (("disk1", "disk2"), ("disk2", "disk3"), ("disk3", "disk1"))
 INTERNET_PROBE_URL = "https://1.1.1.1/"
 
@@ -264,6 +266,16 @@ def maintenance_status() -> dict[str, dict]:
     return result
 
 
+def image_update_status() -> dict:
+    try:
+        value = json.loads(IMAGE_UPDATE_STATUS_FILE.read_text())
+        if not isinstance(value, dict):
+            raise ValueError("invalid image update status")
+        return value
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {"checked_at": None, "updates_available": None, "updates": [], "errors": []}
+
+
 def backup_status(now: int) -> dict:
     """Report the three cross-disk Docker-state replicas from their manifests."""
     copies = []
@@ -450,6 +462,10 @@ def main() -> None:
     parity_disk = parity_disk_status()
     backup = backup_status(now)
     connectivity = connectivity_status()
+    image_updates = image_update_status()
+    if "container_images" in maintenance:
+        maintenance["container_images"]["update_count"] = image_updates.get("updates_available")
+        maintenance["container_images"]["error_count"] = len(image_updates.get("errors", []))
     if not previous_state.get("data_pool_snapshot_backfilled") or len(history) <= 1:
         history = snapshot_backfill(data_pool, now) + history
 
@@ -486,6 +502,7 @@ def main() -> None:
         "parity_disk": parity_disk,
         "backup": backup,
         "connectivity": connectivity,
+        "image_updates": image_updates,
         "incidents": incidents(maintenance),
     }
     write_json(STATE_FILE, state)

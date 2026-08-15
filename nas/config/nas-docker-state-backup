@@ -10,6 +10,12 @@ if ! flock -n 9; then
   exit 0
 fi
 
+# Logical PostgreSQL archives make the two stateful application databases
+# portable across PostgreSQL installations and versions. They are stored in
+# disk1's Docker subvolume so the fresh btrbk snapshot below and the cross-disk
+# replica both capture the same validated archives.
+/usr/local/sbin/nas-database-backup
+
 # A fresh immutable source avoids copying active SQLite/Postgres files directly.
 btrbk -c /etc/btrbk/btrbk.conf run
 

@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Create portable PostgreSQL archives before Docker-state snapshots are taken.
+set -euo pipefail
+
+readonly DUMP_ROOT="${NAS_DATABASE_BACKUP_ROOT:-/mnt/disk1/pool/docker/database-dumps}"
+
+dump_postgres() {
+  local label="$1" container="$2" target_dir="$DUMP_ROOT/$label"
+  local next_dump next_manifest created_at checksum size_bytes
+
+  if [[ "$(docker inspect --format '{{.State.Status}}' "$container" 2>/dev/null || true)" != "running" ]]; then
+    printf '%s is not running; refusing to replace its last portable database backup\n' "$container" >&2
+    return 1
+  fi
+
+  install -d -o root -g nas -m 0750 "$target_dir"
+  next_dump="$(mktemp --tmpdir="$target_dir" .database.dump.XXXXXX)"
+  next_manifest="$(mktemp --tmpdir="$target_dir" .manifest.XXXXXX)"
+  cleanup() {
+    rm -f -- "$next_dump" "$next_manifest"
+  }
+  trap cleanup RETURN
+
+  docker exec "$container" sh -eu -c \
+    'exec pg_dump --format=custom --compress=6 --clean --if-exists --no-owner --no-privileges --username="$POSTGRES_USER" "$POSTGRES_DB"' \
+    >"$next_dump"
+  [[ -s "$next_dump" ]] || { printf '%s produced an empty archive\n' "$container" >&2; return 1; }
+  docker exec -i "$container" pg_restore --list <"$next_dump" >/dev/null
+
+  created_at="$(date -u +%FT%TZ)"
+  checksum="$(sha256sum "$next_dump" | awk '{print $1}')"
+  size_bytes="$(stat -c %s "$next_dump")"
+  printf 'database=%s\ncontainer=%s\ncreated_at=%s\nsha256=%s\nsize_bytes=%s\n' \
+    "$label" "$container" "$created_at" "$checksum" "$size_bytes" >"$next_manifest"
+  chown root:nas "$next_dump" "$next_manifest"
+  chmod 0640 "$next_dump" "$next_manifest"
+  mv -f -- "$next_dump" "$target_dir/latest.dump"
+  mv -f -- "$next_manifest" "$target_dir/MANIFEST"
+  trap - RETURN
+  printf 'Created portable %s database archive at %s/latest.dump\n' "$label" "$target_dir"
+}
+
+dump_postgres immich immich_postgres
+dump_postgres nextcloud nextcloud_postgres

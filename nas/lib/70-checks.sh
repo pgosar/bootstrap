@@ -691,6 +691,16 @@ check_common_services() {
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-weekly-digest)" "docker logs" "weekly digest scans Docker logs"
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-weekly-digest)" "CRITICAL NAS ALERTS" "weekly digest emphasizes critical alerts"
   check_unit_enabled nas-weekly-digest.timer true
+  check_path_exists "$(target_path /usr/local/sbin/nas-container-health-alert)"
+  check_path_exists "$(target_path /etc/systemd/system/nas-container-health-alert.timer)"
+  check_file_contains_literal "$(target_path /usr/local/sbin/nas-container-health-alert)" "docker-health" "container health transitions use NAS notifications"
+  check_unit_enabled nas-container-health-alert.timer true
+  check_path_exists "$(target_path /usr/local/sbin/nas-container-image-monitor)"
+  check_path_exists "$(target_path /etc/systemd/system/nas-container-image-monitor.timer)"
+  check_file_contains_literal "$(target_path /usr/local/sbin/nas-container-image-monitor)" "docker pull --quiet" "container image monitor checks pinned release channels"
+  check_unit_enabled nas-container-image-monitor.timer true
+  check_path_exists "$(target_path /usr/local/sbin/nas-database-backup)"
+  check_file_contains_literal "$(target_path /usr/local/sbin/nas-database-backup)" "pg_dump --format=custom" "portable PostgreSQL archives are created"
   check_path_exists "$(target_path /usr/local/sbin/nas-recent-files)"
   check_path_exists "$(target_path /usr/local/sbin/nas-duplicate-report)"
   check_path_exists "$(target_path /etc/systemd/system/nas-recent-files.timer)"

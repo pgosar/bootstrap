@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Notify once when Docker container health changes, and once on recovery.
+set -euo pipefail
+
+readonly STATE_DIR="${NAS_CONTAINER_HEALTH_STATE_DIR:-/var/lib/nas-container-health-alert}"
+readonly STATE_FILE="$STATE_DIR/state"
+readonly STATUS_FILE="$STATE_DIR/status.json"
+readonly NO_NOTIFY="${NAS_CONTAINER_HEALTH_ALERT_NO_NOTIFY:-false}"
+
+install -d -m 0755 "$STATE_DIR"
+tmp_bad="$(mktemp)"
+tmp_state="$(mktemp --tmpdir="$STATE_DIR" .state.XXXXXX)"
+tmp_status="$(mktemp --tmpdir="$STATE_DIR" .status.XXXXXX)"
+cleanup() {
+  rm -f -- "$tmp_bad" "$tmp_state" "$tmp_status"
+}
+trap cleanup EXIT
+
+if ! docker info >/dev/null 2>&1; then
+  printf 'docker-daemon\tunavailable\n' >"$tmp_bad"
+else
+  while IFS=$'\t' read -r id name; do
+    [[ -n "$id" ]] || continue
+    state_health="$(docker inspect --format '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$id")"
+    state="${state_health%%|*}"
+    health="${state_health#*|}"
+    if [[ "$state" != "running" ]]; then
+      printf '%s\t%s\n' "$name" "$state" >>"$tmp_bad"
+    elif [[ "$health" == "unhealthy" || "$health" == "none" ]]; then
+      printf '%s\t%s\n' "$name" "$health" >>"$tmp_bad"
+    fi
+  done < <(docker ps -a --format '{{.ID}}\t{{.Names}}')
+fi
+sort -u "$tmp_bad" -o "$tmp_bad"
+cp "$tmp_bad" "$tmp_state"
+chmod 0644 "$tmp_state"
+
+previous=""
+[[ ! -f "$STATE_FILE" ]] || previous="$(cat "$STATE_FILE")"
+current="$(cat "$tmp_bad")"
+if [[ "$current" != "$previous" && "$NO_NOTIFY" != "true" ]]; then
+  if [[ -z "$current" ]]; then
+    /usr/local/sbin/nas-notify docker-health 'All Docker containers recovered and are healthy.'
+  else
+    message=$'Docker container health needs attention:\n'
+    while IFS=$'\t' read -r name status; do
+      message+="- $name: $status"
+      message+=$'\n'
+    done <"$tmp_bad"
+    /usr/local/sbin/nas-notify docker-health "$message"
+  fi
+fi
+
+jq -n \
+  --arg checked_at "$(date -u +%FT%TZ)" \
+  --slurpfile issues <(jq -Rn '[inputs | select(length > 0) | split("\t") | {container: .[0], status: .[1]}]' <"$tmp_bad") \
+  '{checked_at: $checked_at, healthy: ($issues[0] | length == 0), issues: $issues[0]}' >"$tmp_status"
+chmod 0644 "$tmp_status"
+mv -f -- "$tmp_state" "$STATE_FILE"
+mv -f -- "$tmp_status" "$STATUS_FILE"
+
+[[ -z "$current" ]]

@@ -225,8 +225,8 @@ done
 
 docker_bad="$tmp_dir/docker.bad"
 docker ps -a --format '{{.Names}}\t{{.Status}}' 2>/dev/null |
-  awk -F '\t' '$2 !~ /^Up / {print}' | sed -n "1,${MAX_ITEMS}p" >"$docker_bad" || true
-docker_bad_count="$(docker ps -a --format '{{.Names}}\t{{.Status}}' 2>/dev/null | awk -F '\t' '$2 !~ /^Up / {count++} END {print count + 0}' || true)"
+  awk -F '\t' '$2 !~ /^Up / || $2 ~ /\((unhealthy|starting)\)/ {print}' | sed -n "1,${MAX_ITEMS}p" >"$docker_bad" || true
+docker_bad_count="$(docker ps -a --format '{{.Names}}\t{{.Status}}' 2>/dev/null | awk -F '\t' '$2 !~ /^Up / || $2 ~ /\((unhealthy|starting)\)/ {count++} END {print count + 0}' || true)"
 docker_log_errors="$tmp_dir/docker.log.errors"
 : >"$docker_log_errors"
 while IFS= read -r container; do
@@ -333,7 +333,7 @@ report="$REPORT_DIR/$(date +%Y-%m-%d).txt"
   timer_state snapraid-sync.timer
   timer_state snapraid-scrub.timer
   printf '\nDocker:\n'
-  printf 'Containers not Up: %s\n' "$docker_bad_count"
+  printf 'Containers not healthy/running: %s\n' "$docker_bad_count"
   sed -n '1,8p' "$docker_bad"
   printf 'Log error-like lines (last 7 days): %s\n' "$docker_log_error_count"
   awk -F '\t' '{print "- " $1 " lines " $2}' "$docker_log_errors"
@@ -388,7 +388,7 @@ $status
 • Recent additions: media +$recent_media · ISOs +$recent_isos · personal +$recent_personal · Immich +$recent_immich_images
 
 **Operations**
-• Docker: $docker_bad_count not running · $docker_log_error_count log signal(s)
+• Docker: $docker_bad_count not healthy/running · $docker_log_error_count log signal(s)
 • Storage: $disk_low_free_count low-space alert(s) · ${disk_imbalance_gib} GiB disk imbalance
 • Protection: $backup_failure_count backup/parity failure(s) · $btrfs_scrub_error_count scrub issue(s)
 

@@ -45,9 +45,13 @@ configure_operations_basics() {
   run chmod 0755 "$(target_path /usr/local/sbin/nas-duplicate-report)"
   copy_with_backup "$NAS_ROOT/config/nas-uptime-ledger" "$(target_path /usr/local/sbin/nas-uptime-ledger)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-uptime-ledger)"
+  copy_with_backup "$NAS_ROOT/config/nas-container-health-alert" "$(target_path /usr/local/sbin/nas-container-health-alert)"
+  run chmod 0755 "$(target_path /usr/local/sbin/nas-container-health-alert)"
+  copy_with_backup "$NAS_ROOT/config/nas-container-image-monitor" "$(target_path /usr/local/sbin/nas-container-image-monitor)"
+  run chmod 0755 "$(target_path /usr/local/sbin/nas-container-image-monitor)"
   copy_with_backup "$NAS_ROOT/config/nas-nextcloud-external-scan" "$(target_path /usr/local/sbin/nas-nextcloud-external-scan)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-nextcloud-external-scan)"
-  for unit in nas-recent-files.service nas-recent-files.timer nas-duplicate-report.service nas-duplicate-report.timer nas-uptime-ledger.service nas-uptime-ledger.timer nas-nextcloud-external-scan.service nas-nextcloud-external-scan.timer; do
+  for unit in nas-recent-files.service nas-recent-files.timer nas-duplicate-report.service nas-duplicate-report.timer nas-uptime-ledger.service nas-uptime-ledger.timer nas-container-health-alert.service nas-container-health-alert.timer nas-container-image-monitor.service nas-container-image-monitor.timer nas-nextcloud-external-scan.service nas-nextcloud-external-scan.timer; do
     copy_with_backup "$NAS_ROOT/config/systemd/$unit" "$(target_path "/etc/systemd/system/$unit")"
   done
   copy_with_backup "$NAS_ROOT/config/nas-secrets" "$(target_path /usr/local/bin/nas-secrets)"
@@ -215,6 +219,8 @@ configure_btrbk() {
   ensure_dir "$(target_path /usr/local/sbin)"
   copy_with_backup "$NAS_ROOT/config/nas-docker-state-backup" "$(target_path /usr/local/sbin/nas-docker-state-backup)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-docker-state-backup)"
+  copy_with_backup "$NAS_ROOT/config/nas-database-backup" "$(target_path /usr/local/sbin/nas-database-backup)"
+  run chmod 0755 "$(target_path /usr/local/sbin/nas-database-backup)"
   local unit
   for unit in btrbk.service btrbk.timer nas-docker-state-backup.service nas-docker-state-backup.timer 'mnt-docker\x2dstate\x2dbackup.mount' 'data-backups-docker\x2dstate.mount'; do
     copy_with_backup "$NAS_ROOT/config/systemd/$unit" "$(target_path "/etc/systemd/system/$unit")"
@@ -324,6 +330,8 @@ enable_services() {
   target_run systemctl enable nas-recent-files.timer
   target_run systemctl enable nas-duplicate-report.timer
   target_run systemctl enable nas-uptime-ledger.timer
+  target_run systemctl enable nas-container-health-alert.timer
+  target_run systemctl enable nas-container-image-monitor.timer
   target_run systemctl enable nas-nextcloud-external-scan.timer
   if [[ "$START_SERVICES" == true && "$TARGET_MODE" == "host" ]]; then
     target_run systemctl start systemd-timesyncd.service
