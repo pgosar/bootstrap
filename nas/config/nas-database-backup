@@ -5,8 +5,9 @@ set -euo pipefail
 readonly DUMP_ROOT="${NAS_DATABASE_BACKUP_ROOT:-/mnt/disk1/pool/docker/database-dumps}"
 
 dump_postgres() {
-  local label="$1" container="$2" target_dir="$DUMP_ROOT/$label"
+  local label="$1" container="$2" target_dir
   local next_dump next_manifest created_at checksum size_bytes
+  target_dir="$DUMP_ROOT/$label"
 
   if [[ "$(docker inspect --format '{{.State.Status}}' "$container" 2>/dev/null || true)" != "running" ]]; then
     printf '%s is not running; refusing to replace its last portable database backup\n' "$container" >&2
