@@ -11,6 +11,14 @@ if ! flock -n 9; then
   exit 0
 fi
 
+sync_result="$(systemctl show snapraid-sync.service -p Result --value 2>/dev/null || true)"
+if [[ "$sync_result" != "success" ]]; then
+  printf 'Scrub deferred because the latest SnapRAID sync result is %s.\n' "${sync_result:-unknown}" >&2
+  /usr/local/sbin/nas-notify snapraid-scrub \
+    "Weekly scrub deferred because the latest snapraid-sync.service result is ${sync_result:-unknown}. Resolve the sync failure, then rerun the scrub." || true
+  exit 0
+fi
+
 output_file="$(mktemp)"
 trap 'rm -f "$output_file"' EXIT
 
