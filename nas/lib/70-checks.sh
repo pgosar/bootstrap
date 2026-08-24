@@ -29,7 +29,7 @@ print_check_summary() {
 
 check_path_exists() {
   local path="$1"
-  [[ -e "$path" ]] && check_pass "$path exists" || check_fail "$path exists"
+  [[ -e "$path" || -L "$path" ]] && check_pass "$path exists" || check_fail "$path exists"
 }
 
 check_dir_exists() {
@@ -125,6 +125,15 @@ check_file_not_contains_literal() {
     check_fail "$label"
   else
     check_pass "$label"
+  fi
+}
+
+check_symlink_target() {
+  local path="$1" expected="$2" label="$3"
+  if [[ -L "$path" && "$(readlink "$path")" == "$expected" ]]; then
+    check_pass "$label"
+  else
+    check_fail "$label"
   fi
 }
 
@@ -339,7 +348,15 @@ check_common_data_mounts() {
   check_mount_mergerfs_like "$(active_mount_path "$MERGERFS_MOUNT")" "$MERGERFS_MOUNT appears mergerfs-backed"
   check_mount_mergerfs_like "$(active_mount_path "$SNAPSHOT_VIEW_MOUNT")" "$SNAPSHOT_VIEW_MOUNT appears mergerfs-backed"
   check_path_exists "$(target_path /usr/local/bin/nas-secrets)"
-  check_dir_exists "$(active_mount_path "$MERGERFS_MOUNT/secrets")"
+  if [[ "$TARGET_MODE" == "live" ]]; then
+    check_symlink_target \
+      "$(active_mount_path "$MERGERFS_MOUNT/secrets")" \
+      "/var/lib/nas-secrets/locked" \
+      "$MERGERFS_MOUNT/secrets uses the target-side locked sentinel"
+    check_dir_exists "$(target_path /var/lib/nas-secrets/locked)"
+  else
+    check_dir_exists "$(active_mount_path "$MERGERFS_MOUNT/secrets")"
+  fi
   check_dir_exists "$(active_mount_path "$MERGERFS_MOUNT/.secrets-encrypted")"
   if [[ -f "$(active_mount_path "$MERGERFS_MOUNT/.secrets-encrypted/gocryptfs.conf")" ]]; then
     check_pass "encrypted secrets are initialized"
@@ -361,7 +378,6 @@ check_common_pool_dirs() {
     "$MERGERFS_MOUNT/media/torrents" \
     "$MERGERFS_MOUNT/personal" \
     "$MERGERFS_MOUNT/replicas" \
-    "$MERGERFS_MOUNT/secrets" \
     "$MERGERFS_MOUNT/staging" \
     "$MERGERFS_MOUNT/docker" \
     "$MERGERFS_MOUNT/backups" \
@@ -460,6 +476,20 @@ check_common_docker() {
   check_file_contains_literal "$docker_override" "RequiresMountsFor=$MERGERFS_MOUNT" "Docker waits for $MERGERFS_MOUNT"
   check_file_contains_literal "$docker_override" "After=network-online.target" "Docker waits for network-online target"
   check_file_contains_literal "$docker_override" "Docker published ports are explicit exposure" "Docker exposure stance documented"
+  if [[ "$NAS_DOCKER_REPO_REQUIRED" == "true" ]]; then
+    local active_docker_root repo_check_path
+    active_docker_root="$(active_mount_path "$DOCKER_ROOT")"
+    repo_check_path="$active_docker_root"
+    if [[ "$TARGET_MODE" == "live" ]]; then
+      repo_check_path="$DOCKER_ROOT"
+    fi
+    check_dir_exists "$active_docker_root/.git"
+    if check_run_target sudo -Hu "$NAS_USER" git -C "$repo_check_path" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      check_pass "nas-docker Git checkout is usable"
+    else
+      check_fail "nas-docker Git checkout is usable"
+    fi
+  fi
   check_unit_enabled docker true
   if [[ "$TARGET_MODE" == "host" ]]; then
     if systemctl cat docker 2>/dev/null | grep -F "RequiresMountsFor=$MERGERFS_MOUNT" >/dev/null; then
@@ -482,9 +512,18 @@ check_common_pc_worker_orchestration() {
   check_path_exists "$(target_path /etc/systemd/system/immich-ml-wake-proxy.service)"
   check_path_exists "$(target_path /etc/systemd/system/tdarr-wake-monitor.service)"
   check_path_exists "$(target_path /etc/systemd/system/tdarr-wake-monitor.timer)"
+  check_file_contains_literal "$(target_path /etc/systemd/system/immich-ml-wake-proxy.service)" "User=$NAS_USER" "Immich ML wake proxy runs as $NAS_USER"
+  check_file_contains_literal "$(target_path /etc/systemd/system/tdarr-wake-monitor.service)" "User=$NAS_USER" "Tdarr wake monitor runs as $NAS_USER"
   check_path_exists "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/immich-ml-wake-proxy.py"
   check_path_exists "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/tdarr-wake-monitor.sh"
   check_path_exists "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/pc-worker-ensure.sh"
+  local orchestrator_script
+  for orchestrator_script in immich-ml-wake-proxy.py nightly-pc-jobs.sh pc-worker-ensure.sh tdarr-wake-monitor.sh; do
+    check_symlink_target \
+      "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/$orchestrator_script" \
+      "../../nightly-orchestrator/$orchestrator_script" \
+      "$orchestrator_script compatibility path uses tracked nas-docker source"
+  done
   check_file_contains_literal "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/tdarr-wake-monitor.sh" \
     "pc-auto-wake-boot-id" "PC shutdown requires matching automatic-wake boot ID"
   check_file_contains_literal "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/pc-worker-ensure.sh" \
@@ -509,9 +548,10 @@ check_common_snapraid_btrbk_samba() {
     check_path_exists "$snapraid_conf"
     check_dir_exists "$(target_path /var/lib/snapraid)"
     check_command_exists_target snapraid && check_pass "snapraid command installed" || check_fail "snapraid command installed"
-    for path in torrents iso-mirror staging snapshots '#recycle'; do
+    for path in torrents staging snapshots '#recycle'; do
       check_file_contains_literal "$snapraid_conf" "$path" "SnapRAID excludes $path"
     done
+    check_file_not_contains_literal "$snapraid_conf" "exclude /media/linux-isos" "SnapRAID protects Linux ISO mirror"
     check_file_not_contains_literal "$snapraid_conf" "exclude /backups/" "SnapRAID protects backups"
     for idx in "${!DATA_DISK_LABELS[@]}"; do
       mountpoint="/mnt/disk$((idx + 1))"
@@ -582,6 +622,17 @@ check_common_snapraid_btrbk_samba() {
       check_warn "btrbk dryrun skipped in live target check"
     fi
     check_unit_enabled btrbk.timer true
+    check_dir_exists "$(active_mount_path /mnt/disk2)/pool/backups/docker-state/disk1"
+    check_dir_exists "$(active_mount_path /mnt/disk3)/pool/backups/docker-state/disk2"
+    check_dir_exists "$(active_mount_path /mnt/disk1)/pool/backups/docker-state/disk3"
+    check_unit_enabled 'mnt-docker\x2dstate\x2dbackup.mount' true
+    check_unit_enabled 'data-backups-docker\x2dstate.mount' true
+    if [[ "$TARGET_MODE" == "host" ]]; then
+      check_unit_active 'mnt-docker\x2dstate\x2dbackup.mount' true
+      check_unit_active 'data-backups-docker\x2dstate.mount' true
+      check_mount_exists /mnt/docker-state-backup
+      check_mount_exists "$MERGERFS_MOUNT/backups/docker-state"
+    fi
   fi
 
   if [[ "$SMB_ENABLE" == "true" ]]; then
@@ -667,6 +718,15 @@ check_common_services() {
   check_unit_enabled nas-kernel-maintenance-reminder.timer true
   check_path_exists "$(target_path /etc/zsh/zshrc)"
   check_file_contains_literal "$(target_path /etc/zsh/zshrc)" "nas-kernel-reminder.sh" "zsh interactive shells source kernel reminder"
+  if [[ "$PARITY_SPINDOWN_ENABLE" == "true" ]]; then
+    check_path_exists "$(target_path /usr/local/sbin/nas-parity-spindown)"
+    check_path_exists "$(target_path /etc/default/nas-storage)"
+    check_file_contains_literal "$(target_path /etc/default/nas-storage)" "PARITY_DISK=" "parity spindown uses reviewed disk config"
+    check_unit_enabled nas-parity-spindown.service true
+    if [[ "$TARGET_MODE" == "host" ]]; then
+      check_unit_active nas-parity-spindown.service true
+    fi
+  fi
   if [[ "$SWAP_ENABLE" == "true" ]]; then
     check_path_exists "$(target_path "$SWAP_FILE")"
     check_file_contains_literal "$(target_path /etc/fstab)" "$SWAP_FILE none swap defaults 0 0" "swapfile is persistent in fstab"

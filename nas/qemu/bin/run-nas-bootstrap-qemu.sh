@@ -9,6 +9,7 @@ LOG_DIR="$WORKDIR/logs"
 SHARED_DIR="$WORKDIR/shared"
 HTTP_PORT="${QEMU_HTTP_PORT:-18080}"
 QEMU_SSH_PORT="${QEMU_SSH_PORT:-2222}"
+NAS_DOCKER_BUNDLE="${NAS_DOCKER_BUNDLE:-}"
 OVMF_VARS="$WORKDIR/OVMF_VARS.fd"
 FORCE=false
 ISO_PATH=""
@@ -66,6 +67,7 @@ Environment:
   QEMU_SSH_PORT=2222
   OVMF_CODE=/path/to/OVMF_CODE.4m.fd
   OVMF_VARS_TEMPLATE=/path/to/OVMF_VARS.4m.fd
+  NAS_DOCKER_BUNDLE=/path/to/nas-docker.bundle
 EOF
 }
 
@@ -111,6 +113,8 @@ OVMF_VARS_TEMPLATE="${OVMF_VARS_TEMPLATE:-$(first_existing \
   || true)}"
 
 [[ -f "$ISO_PATH" ]] || die "Arch ISO not found: $ISO_PATH"
+[[ -n "$NAS_DOCKER_BUNDLE" ]] || die "NAS_DOCKER_BUNDLE is required so the fresh guest includes the tracked Docker and PC-orchestration source"
+[[ -f "$NAS_DOCKER_BUNDLE" ]] || die "nas-docker git bundle not found: $NAS_DOCKER_BUNDLE"
 [[ -f "$OVMF_CODE" ]] || die "OVMF code image not found: $OVMF_CODE"
 [[ -f "$OVMF_VARS_TEMPLATE" ]] || die "OVMF vars template not found: $OVMF_VARS_TEMPLATE"
 
@@ -118,6 +122,7 @@ require_cmd qemu-system-x86_64
 require_cmd qemu-img
 require_cmd python3
 require_cmd tar
+require_cmd git
 
 if [[ -e "$WORKDIR" ]] && [[ "$FORCE" != true ]]; then
   die "$WORKDIR already exists; rerun with --force or set QEMU_WORKDIR to a new path"
@@ -144,6 +149,7 @@ cp -a "$NAS_DIR/qemu/guest/stage2.sh" "$STAGED_REPO/nas/qemu/guest/stage2.sh"
 cp -a "$NAS_DIR/qemu/checks/verify-live-target.sh" "$STAGED_REPO/nas/qemu/checks/verify-live-target.sh"
 cp -a "$NAS_DIR/qemu/checks/verify-installed-health.sh" "$STAGED_REPO/nas/qemu/checks/verify-installed-health.sh"
 cp -a "$NAS_DIR/qemu/qemu-nas.env" "$STAGED_REPO/nas/qemu/qemu-nas.env"
+cp -a "$NAS_DOCKER_BUNDLE" "$STAGED_REPO/nas/qemu/nas-docker.bundle"
 cp -a "$NAS_DIR/qemu/README.md" "$STAGED_REPO/nas/qemu/README.md"
 [[ -f "$ROOT_DIR/README.md" ]] && cp -a "$ROOT_DIR/README.md" "$STAGED_REPO/README.md"
 [[ -f "$ROOT_DIR/.gitignore" ]] && cp -a "$ROOT_DIR/.gitignore" "$STAGED_REPO/.gitignore"
@@ -256,6 +262,9 @@ if grep -F "Unknown parameter 'category.create'" "$INSTALL_LOG" "$BOOT_LOG" "$FI
 fi
 if grep -F "Unknown parameter 'fsname'" "$INSTALL_LOG" "$BOOT_LOG" "$FINAL_LOG" >/dev/null 2>&1; then
   die "previous mergerfs fsname error appeared in QEMU logs"
+fi
+if grep -E "symbol lookup error|GLIBC_PRIVATE" "$INSTALL_LOG" "$BOOT_LOG" "$FINAL_LOG" >/dev/null 2>&1; then
+  die "live-target binary/loader ABI error appeared in QEMU logs"
 fi
 if grep -E "fuse[.]mergerfs" "$SHARED_DIR/target-fstab" >/dev/null 2>&1; then
   die "target fstab contains deprecated mergerfs fstype"

@@ -3,6 +3,7 @@ configure_operations_basics() {
   ensure_dir "$(target_path /etc/systemd/journald.conf.d)"
   ensure_dir "$(target_path /etc/profile.d)"
   ensure_dir "$(target_path /etc/NetworkManager/system-connections)"
+  ensure_dir "$(target_path /etc/default)"
   ensure_dir "$(target_path /etc/sysctl.d)"
   ensure_dir "$(target_path /etc/zsh)"
   ensure_dir "$(target_path /usr/local/sbin)"
@@ -18,6 +19,10 @@ configure_operations_basics() {
   copy_with_backup "$NAS_ROOT/config/nas-parity-spindown" "$(target_path /usr/local/sbin/nas-parity-spindown)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-parity-spindown)"
   copy_with_backup "$NAS_ROOT/config/systemd/nas-parity-spindown.service" "$(target_path /etc/systemd/system/nas-parity-spindown.service)"
+  write_text "$(target_path /etc/default/nas-storage)" \
+    "PARITY_DISK=$(printf '%q' "$PARITY_DISK")"$'\n'\
+"NAS_USER=$(printf '%q' "$NAS_USER")"$'\n'\
+"NAS_GROUP=$(printf '%q' "$NAS_GROUP")"$'\n'
   copy_with_backup "$NAS_ROOT/config/nas-kernel-maintenance-reminder" "$(target_path /usr/local/sbin/nas-kernel-maintenance-reminder)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-kernel-maintenance-reminder)"
   copy_with_backup "$NAS_ROOT/config/systemd/nas-kernel-maintenance-reminder.service" "$(target_path /etc/systemd/system/nas-kernel-maintenance-reminder.service)"
@@ -216,6 +221,12 @@ configure_snapraid() {
 configure_btrbk() {
   log "Phase: btrbk config and timer"
   copy_with_backup "$NAS_ROOT/config/btrbk.conf.example" "$(target_path /etc/btrbk/btrbk.conf)"
+  # The read-only backup union is enabled at boot, before the first backup job
+  # has had a chance to create its per-source roots.  Create every mergerfs
+  # branch up front so a fresh install does not start with failed mount units.
+  ensure_dir "$(target_path /mnt/disk2/pool/backups/docker-state/disk1)"
+  ensure_dir "$(target_path /mnt/disk3/pool/backups/docker-state/disk2)"
+  ensure_dir "$(target_path /mnt/disk1/pool/backups/docker-state/disk3)"
   ensure_dir "$(target_path /usr/local/sbin)"
   copy_with_backup "$NAS_ROOT/config/nas-docker-state-backup" "$(target_path /usr/local/sbin/nas-docker-state-backup)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-docker-state-backup)"
@@ -241,6 +252,35 @@ configure_docker() {
     die "$active_data must be mounted before Docker setup"
   fi
   ensure_dir "$active_docker_root"
+  if [[ "$NAS_DOCKER_REPO_REQUIRED" == "true" ]]; then
+    local repo_check_path="$active_docker_root"
+    if [[ "$TARGET_MODE" == "live" ]]; then
+      repo_check_path="$DOCKER_ROOT"
+    fi
+    if [[ "$APPLY" == true ]] && ! target_run_capture sudo -Hu "$NAS_USER" git -C "$repo_check_path" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      is_placeholder "$NAS_DOCKER_REPO_SOURCE" && die "NAS_DOCKER_REPO_SOURCE must name an accessible git bundle, local repository, or clone URL on a fresh install"
+      if find "$active_docker_root" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+        die "$active_docker_root is not a Git checkout and is not empty; restore or move the existing state before cloning nas-docker"
+      fi
+      if [[ "$TARGET_MODE" == "live" && -f "$NAS_DOCKER_REPO_SOURCE" ]]; then
+        local staged_repo_source="/var/tmp/nas-docker-source.bundle"
+        run install -m 0600 "$NAS_DOCKER_REPO_SOURCE" "$(target_path "$staged_repo_source")"
+        target_run chown "$NAS_USER:$NAS_GROUP" "$staged_repo_source"
+        target_run sudo -Hu "$NAS_USER" git clone --no-hardlinks "$staged_repo_source" "$DOCKER_ROOT"
+        run rm -f "$(target_path "$staged_repo_source")"
+      elif [[ "$TARGET_MODE" == "live" && -e "$NAS_DOCKER_REPO_SOURCE" ]]; then
+        die "live-mode local NAS_DOCKER_REPO_SOURCE must be a git bundle file; use git bundle create or a clone URL"
+      else
+        target_run sudo -Hu "$NAS_USER" git clone --no-hardlinks "$NAS_DOCKER_REPO_SOURCE" "$DOCKER_ROOT"
+      fi
+    elif [[ "$APPLY" != true ]]; then
+      log "+ ensure nas-docker checkout at $(printf '%q' "$active_docker_root") from $(printf '%q' "$NAS_DOCKER_REPO_SOURCE")"
+    fi
+    if [[ "$APPLY" == true ]]; then
+      target_run_capture sudo -Hu "$NAS_USER" git -C "$repo_check_path" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+        || die "$active_docker_root is not a usable nas-docker Git checkout"
+    fi
+  fi
   ensure_dir "$active_compose"
   ensure_dir "$active_appdata"
   if [[ "$APPLY" == true ]]; then
@@ -267,9 +307,47 @@ configure_pc_worker_orchestration() {
     return 0
   fi
 
+  local orchestrator_source="$DOCKER_ROOT/nightly-orchestrator"
+  local orchestrator_compat="$DOCKER_COMPOSE_DIR/nightly-orchestrator"
+  ensure_dir "$(target_path "$orchestrator_compat")"
+  local orchestrator_script source_path compat_path
+  for orchestrator_script in \
+    immich-ml-wake-proxy.py \
+    nightly-pc-jobs.sh \
+    pc-worker-ensure.sh \
+    tdarr-wake-monitor.sh; do
+    source_path="$(target_path "$orchestrator_source/$orchestrator_script")"
+    compat_path="$(target_path "$orchestrator_compat/$orchestrator_script")"
+    if [[ "$APPLY" == true ]]; then
+      [[ -f "$source_path" ]] \
+        || die "tracked PC worker orchestration source is missing after Docker repo restore: $orchestrator_source/$orchestrator_script"
+      if [[ -e "$compat_path" && ! -L "$compat_path" ]]; then
+        die "refusing to replace non-symlink PC worker compatibility path: $orchestrator_compat/$orchestrator_script"
+      fi
+    fi
+    run ln -sfn "../../nightly-orchestrator/$orchestrator_script" "$compat_path"
+  done
+
+  if [[ "$APPLY" == true ]]; then
+    local required_script
+    for required_script in \
+      "$DOCKER_COMPOSE_DIR/nightly-orchestrator/immich-ml-wake-proxy.py" \
+      "$DOCKER_COMPOSE_DIR/nightly-orchestrator/tdarr-wake-monitor.sh" \
+      "$DOCKER_COMPOSE_DIR/nightly-orchestrator/pc-worker-ensure.sh"; do
+      [[ -f "$(target_path "$required_script")" ]] \
+        || die "PC worker orchestration source is missing after Docker repo restore: $required_script"
+    done
+  fi
+
   local unit
   for unit in immich-ml-wake-proxy.service tdarr-wake-monitor.service tdarr-wake-monitor.timer; do
     copy_with_backup "$NAS_ROOT/config/systemd/$unit" "$(target_path "/etc/systemd/system/$unit")"
+  done
+  for unit in immich-ml-wake-proxy.service tdarr-wake-monitor.service; do
+    log "+ set User=$NAS_USER in $(target_path "/etc/systemd/system/$unit")"
+    if [[ "$APPLY" == true ]]; then
+      sed -i -E "s/^User=.*/User=$NAS_USER/" "$(target_path "/etc/systemd/system/$unit")"
+    fi
   done
 }
 
@@ -376,7 +454,9 @@ enable_services() {
   fi
   target_run systemctl enable nas-btrfs-scrub-disk1.timer nas-btrfs-scrub-disk2.timer nas-btrfs-scrub-disk3.timer
   target_run systemctl enable nas-power-profile.service
-  target_run systemctl enable nas-parity-spindown.service
+  if [[ "$PARITY_SPINDOWN_ENABLE" == "true" ]]; then
+    target_run systemctl enable nas-parity-spindown.service
+  fi
   target_run systemctl enable nas-url-queue-notify.path
   if [[ "$SNAPPER_ENABLE" == "true" ]]; then
     target_run systemctl enable snapper-timeline.timer snapper-cleanup.timer
@@ -410,6 +490,12 @@ Then run:
 Then reboot without the ISO and run:
 
   sudo $SCRIPT_DIR/bootstrap-nas.sh --env-file $ENV_FILE --check-health
+
+The tracked Docker source is restored during bootstrap. Before starting
+application stacks, follow $DOCKER_ROOT/NAS_RESTORE.md to restore encrypted
+environment inputs, application state, and database archives. Tailscale,
+Samba passwords, and notification delivery also require their protected
+operator-managed credentials.
 EOF
 }
 

@@ -31,7 +31,7 @@ pc/qemu/OVMF_VARS.fd
 __pycache__/
 *.pyc
 nas/.work/
-nas/qemu/work/
+nas/qemu/work*/
 nas/qemu/logs/
 .qemu-nas-test/
 *.qcow2

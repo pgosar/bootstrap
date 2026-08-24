@@ -272,10 +272,11 @@ mount_live_mergerfs_explicit() {
     printf '%s' "${snapshot_branches[*]}"
   )"
 
-  local active_pool_mount active_snapshot_mount mergerfs_bin mergerfs_lib_path data_opts snapshot_opts
+  local active_pool_mount active_snapshot_mount mergerfs_bin mergerfs_loader mergerfs_lib_path data_opts snapshot_opts
   active_pool_mount="$(active_mount_path "$MERGERFS_MOUNT")"
   active_snapshot_mount="$(active_mount_path "$SNAPSHOT_VIEW_MOUNT")"
   mergerfs_bin="$TARGET_ROOT/usr/bin/mergerfs"
+  mergerfs_loader="$TARGET_ROOT/usr/lib/ld-linux-x86-64.so.2"
   mergerfs_lib_path="$TARGET_ROOT/usr/lib"
   data_opts="defaults,cache.files=off,use_ino,ignorepponrename=true,category.create=$MERGERFS_CREATE_POLICY,moveonenospc=true,minfreespace=$MERGERFS_MIN_FREE_SPACE"
   snapshot_opts="defaults,ro,cache.files=off"
@@ -285,19 +286,20 @@ mount_live_mergerfs_explicit() {
 
   if perform_mount_ops_now; then
     [[ -x "$mergerfs_bin" ]] || die "target mergerfs binary not found or not executable: $mergerfs_bin"
+    [[ -x "$mergerfs_loader" ]] || die "target dynamic loader not found or not executable: $mergerfs_loader"
     unmount_all_at_path "$active_pool_mount"
     unmount_all_at_path "$active_snapshot_mount"
   fi
 
-  log "+ LD_LIBRARY_PATH=$(printf '%q' "$mergerfs_lib_path") $(printf '%q' "$mergerfs_bin") -o $(printf '%q' "$data_opts") $(printf '%q' "$joined_pool") $(printf '%q' "$active_pool_mount")"
+  log "+ $(printf '%q' "$mergerfs_loader") --library-path $(printf '%q' "$mergerfs_lib_path") $(printf '%q' "$mergerfs_bin") -o $(printf '%q' "$data_opts") $(printf '%q' "$joined_pool") $(printf '%q' "$active_pool_mount")"
   if perform_mount_ops_now; then
-    LD_LIBRARY_PATH="$mergerfs_lib_path${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+    "$mergerfs_loader" --library-path "$mergerfs_lib_path" \
       "$mergerfs_bin" -o "$data_opts" "$joined_pool" "$active_pool_mount"
   fi
 
-  log "+ LD_LIBRARY_PATH=$(printf '%q' "$mergerfs_lib_path") $(printf '%q' "$mergerfs_bin") -o $(printf '%q' "$snapshot_opts") $(printf '%q' "$joined_snapshot") $(printf '%q' "$active_snapshot_mount")"
+  log "+ $(printf '%q' "$mergerfs_loader") --library-path $(printf '%q' "$mergerfs_lib_path") $(printf '%q' "$mergerfs_bin") -o $(printf '%q' "$snapshot_opts") $(printf '%q' "$joined_snapshot") $(printf '%q' "$active_snapshot_mount")"
   if perform_mount_ops_now; then
-    LD_LIBRARY_PATH="$mergerfs_lib_path${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+    "$mergerfs_loader" --library-path "$mergerfs_lib_path" \
       "$mergerfs_bin" -o "$snapshot_opts" "$joined_snapshot" "$active_snapshot_mount"
     assert_single_mount_at_path "$active_pool_mount"
     assert_single_mount_at_path "$active_snapshot_mount"

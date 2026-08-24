@@ -58,8 +58,15 @@ sudo nas/bootstrap-nas.sh \
 ```
 
 That command installs Arch into `/mnt`, partitions the configured OS disk, sets
-up packages, storage, services, and systemd enablement in the target system.
-Formatting still requires typing `yes, do as I say`.
+up packages, storage, the tracked nas-docker checkout, host services, and
+systemd enablement in the target system. Formatting still requires typing
+`yes, do as I say`.
+
+The bootstrap intentionally does not contain or fabricate runtime appdata,
+database contents, the SOPS age private key, plaintext Compose `.env` files,
+Tailscale authentication, Samba passwords, or notification secrets. After a
+host rebuild, restore those protected inputs in the order documented by
+`/data/docker/NAS_RESTORE.md` before starting application stacks.
 
 Before rebooting, run the live target check:
 

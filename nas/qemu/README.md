@@ -47,8 +47,15 @@ OVMF_VARS_TEMPLATE=/path/to/OVMF_VARS.4m.fd
 From the repo root:
 
 ```bash
-nas/qemu/bin/run-nas-bootstrap-qemu.sh --force /path/to/archlinux.iso
+git -C /path/to/nas-docker bundle create /tmp/nas-docker.bundle --all
+NAS_DOCKER_BUNDLE=/tmp/nas-docker.bundle \
+  nas/qemu/bin/run-nas-bootstrap-qemu.sh --force /path/to/archlinux.iso
 ```
+
+The bundle contains tracked Git history only; ignored runtime `.env` files,
+appdata, databases, and secrets are not included. The harness requires it so
+the installed guest exercises the same tracked Docker and PC-orchestration
+source expected by the host bootstrap.
 
 The default work directory is:
 
@@ -66,8 +73,9 @@ The harness creates these fake disks:
 /dev/vde = SnapRAID parity disk, 4G
 ```
 
-It uses `nas/qemu/qemu-nas.env`, which is intentionally QEMU-only and allows
-`/dev/vdX` paths. Do not use that env file on real hardware.
+It uses `nas/qemu/qemu-nas.env`, which is intentionally QEMU-only, allows
+`/dev/vdX` paths, and restores the staged nas-docker Git bundle. Do not use
+that env file on real hardware.
 
 ## What it checks
 

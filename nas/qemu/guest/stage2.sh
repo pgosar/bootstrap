@@ -128,7 +128,8 @@ cat >"$expected_dirs" <<'EOF'
 /data/replicas
 /data/staging
 EOF
-find /data -maxdepth 1 -mindepth 1 -type d | sort >"$actual_dirs"
+LC_ALL=C sort -o "$expected_dirs" "$expected_dirs"
+LC_ALL=C find /data -maxdepth 1 -mindepth 1 -type d | LC_ALL=C sort >"$actual_dirs"
 diff -u "$expected_dirs" "$actual_dirs"
 run_check test -d /data/secrets
 
@@ -168,6 +169,12 @@ run_check findmnt /mnt/parity
 log "Docker dependency"
 run_check cat /etc/systemd/system/docker.service.d/wait-for-data.conf
 run_shell_check "systemctl cat docker | grep RequiresMountsFor=/data"
+
+log "Docker-state backup mounts"
+run_check systemctl is-active 'mnt-docker\x2dstate\x2dbackup.mount'
+run_check systemctl is-active 'data-backups-docker\x2dstate.mount'
+run_check findmnt /mnt/docker-state-backup
+run_check findmnt /data/backups/docker-state
 
 log "SnapRAID config"
 run_check pacman -Q yay mergerfs snapraid
@@ -214,6 +221,9 @@ run_check systemctl is-enabled nmb
 
 log "standalone installed health script"
 run_check sudo nas/qemu/checks/verify-installed-health.sh "$qemu_env"
+
+log "failed systemd units"
+run_shell_check 'failed="$(systemctl --failed --no-legend --plain)"; if [ -n "$failed" ]; then printf "%s\n" "$failed"; exit 1; fi'
 
 log "forbidden mergerfs error scan"
 if grep -F "Unknown parameter 'category.create'" /root/nas-qemu-stage2.log /host/final-verification.log 2>/dev/null; then
