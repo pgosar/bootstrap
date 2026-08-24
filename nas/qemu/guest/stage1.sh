@@ -158,6 +158,7 @@ raw_rejected_env="/root/qemu-nas-raw-rejected.env"
 
   log "target packages"
   run_check arch-chroot /mnt pacman -Q yay mergerfs snapraid grub snapper snap-pac docker samba btrbk inetutils
+  run_shell_check "! arch-chroot /mnt pacman -Q ufw"
 
   log "target GRUB"
   run_check test -s /mnt/boot/grub/grub.cfg
@@ -185,9 +186,9 @@ raw_rejected_env="/root/qemu-nas-raw-rejected.env"
   run_check arch-chroot /mnt systemctl is-enabled nmb
 
   log "install post-reboot verifier"
-cp -a /root/bootstrap /mnt/root/bootstrap
-cp "$qemu_env" /mnt/root/qemu-nas.env
-install -m 0755 /root/bootstrap/nas/qemu/guest/stage2.sh /mnt/root/guest-stage2.sh
+  cp -a /root/bootstrap /mnt/root/bootstrap
+  cp "$qemu_env" /mnt/root/qemu-nas.env
+  install -m 0755 /root/bootstrap/nas/qemu/guest/stage2.sh /mnt/root/guest-stage2.sh
 
   cat > /mnt/etc/systemd/system/nas-qemu-stage2.service <<'EOF'
 [Unit]

@@ -357,6 +357,8 @@ ensure_active_pool_permissions() {
     run chown "$PUID:$PGID" "$active_data/$directory"
     if [[ "$directory" == .secrets-encrypted ]]; then
       run chmod 0700 "$active_data/$directory"
+    elif [[ "$directory" == personal || "$directory" == backups ]]; then
+      run chmod 2770 "$active_data/$directory"
     else
       run chmod 0775 "$active_data/$directory"
     fi

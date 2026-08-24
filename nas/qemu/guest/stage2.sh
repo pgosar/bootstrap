@@ -57,6 +57,10 @@ run_shell_check 'test "$(hostname)" = nas-qemu'
 
 log "disk layout"
 run_check lsblk -f
+run_shell_check "lsblk -no PARTTYPE /dev/vda1 | grep -iqx c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
+run_shell_check "lsblk -no PARTTYPE /dev/vda2 | grep -iqx 4f68bce3-e8cd-4db1-96e7-fbcaf984b709"
+run_shell_check "lsblk -no PARTLABEL /dev/vda1 | grep -qx EFI"
+run_shell_check "lsblk -no PARTLABEL /dev/vda2 | grep -qx arch-root"
 run_shell_check "lsblk -no LABEL /dev/vdb | grep -qx nas-disk1"
 run_shell_check "lsblk -no LABEL /dev/vdc | grep -qx nas-disk2"
 run_shell_check "lsblk -no LABEL /dev/vdd | grep -qx nas-disk3"
@@ -178,6 +182,7 @@ run_check findmnt /data/backups/docker-state
 
 log "SnapRAID config"
 run_check pacman -Q yay mergerfs snapraid
+run_shell_check "! pacman -Q ufw"
 run_check test -f /etc/snapraid.conf
 run_check test -d /var/lib/snapraid
 run_check command -v snapraid
@@ -198,6 +203,7 @@ run_shell_check "! grep -F '/data' /etc/btrbk/btrbk.conf"
 
 log "GRUB"
 run_check test -s /boot/grub/grub.cfg
+run_check test -s /boot/EFI/ArchNAS/grubx64.efi
 run_check grep -F intel-ucode.img /boot/grub/grub.cfg
 run_check grep -F rootflags=subvol=@ /boot/grub/grub.cfg
 
@@ -218,6 +224,21 @@ run_check systemctl is-enabled snapraid-sync.timer
 run_check systemctl is-enabled snapraid-scrub.timer
 run_check systemctl is-enabled smb
 run_check systemctl is-enabled nmb
+
+log "safe installed helper smoke tests"
+run_check env NAS_CONTAINER_HEALTH_ALERT_NO_NOTIFY=true /usr/local/sbin/nas-container-health-alert
+run_check jq -e '.healthy == true' /var/lib/nas-container-health-alert/status.json
+run_check /usr/local/sbin/nas-uptime-ledger
+run_check jq -e '.baseline and .parity_disk and .connectivity and .maintenance' /var/lib/nas-uptime/status.json
+run_check /usr/local/sbin/nas-recent-files
+run_check test -s /var/lib/nas-recent-files/latest-summary
+run_check /usr/local/sbin/nas-duplicate-report
+run_check env NAS_WEEKLY_DIGEST_NO_NOTIFY=true /usr/local/sbin/nas-weekly-digest
+run_check test -L /var/lib/nas-weekly-report/reports/latest.txt
+
+log "fresh-install handoff"
+run_check test -s /root/NAS_POST_INSTALL_NEXT_STEPS.txt
+run_check grep -F '/data/docker/NAS_RESTORE.md' /root/NAS_POST_INSTALL_NEXT_STEPS.txt
 
 log "standalone installed health script"
 run_check sudo nas/qemu/checks/verify-installed-health.sh "$qemu_env"

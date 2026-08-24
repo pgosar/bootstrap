@@ -37,6 +37,67 @@ check_dir_exists() {
   [[ -d "$path" ]] && check_pass "$path exists" || check_fail "$path exists"
 }
 
+check_file_mode() {
+  local file_path="$1" expected="$2" label="$3" actual
+  if [[ ! -e "$file_path" ]]; then
+    check_fail "$label ($file_path missing)"
+    return 0
+  fi
+  actual="$(stat -Lc '%a' "$file_path" 2>/dev/null || true)"
+  [[ "$actual" == "$expected" ]] && check_pass "$label" || check_fail "$label (mode=${actual:-unknown})"
+}
+
+check_owner_mode() {
+  local file_path="$1" expected_owner="$2" expected_mode="$3" label="$4" actual_owner actual_mode
+  if [[ ! -e "$file_path" ]]; then
+    check_fail "$label ($file_path missing)"
+    return 0
+  fi
+  actual_owner="$(stat -c '%u:%g' "$file_path" 2>/dev/null || true)"
+  actual_mode="$(stat -c '%a' "$file_path" 2>/dev/null || true)"
+  if [[ "$actual_owner" == "$expected_owner" && "$actual_mode" == "$expected_mode" ]]; then
+    check_pass "$label"
+  else
+    check_fail "$label (owner=$actual_owner mode=$actual_mode)"
+  fi
+}
+
+check_file_matches_source() {
+  local source_file="$1" installed_file="$2" label="$3"
+  if [[ ! -f "$source_file" || ! -f "$installed_file" ]]; then
+    check_fail "$label (source or installed file missing)"
+  elif cmp -s "$source_file" "$installed_file"; then
+    check_pass "$label"
+  else
+    check_fail "$label"
+  fi
+}
+
+check_script_syntax() {
+  local installed_path="$1" shebang python_code
+  shebang="$(head -n 1 "$(target_path "$installed_path")" 2>/dev/null || true)"
+  case "$shebang" in
+  *python*)
+    python_code="import ast; ast.parse(open('$installed_path', encoding='utf-8').read(), filename='$installed_path')"
+    if check_run_target python -c "$python_code" >/dev/null 2>&1; then
+      check_pass "$installed_path Python syntax"
+    else
+      check_fail "$installed_path Python syntax"
+    fi
+    ;;
+  *bash*)
+    if check_run_target bash -n "$installed_path" >/dev/null 2>&1; then
+      check_pass "$installed_path Bash syntax"
+    else
+      check_fail "$installed_path Bash syntax"
+    fi
+    ;;
+  *)
+    check_fail "$installed_path has a supported executable shebang"
+    ;;
+  esac
+}
+
 check_mount_exists() {
   local path="$1"
   if findmnt "$path" >/dev/null 2>&1; then
@@ -245,6 +306,17 @@ check_unit_not_failed() {
   fi
 }
 
+check_oneshot_succeeded() {
+  local unit="$1" result exit_status
+  result="$(check_run_target systemctl show "$unit" -p Result --value 2>/dev/null || true)"
+  exit_status="$(check_run_target systemctl show "$unit" -p ExecMainStatus --value 2>/dev/null || true)"
+  if [[ "$result" == "success" && "$exit_status" == "0" ]]; then
+    check_pass "$unit completed successfully"
+  else
+    check_fail "$unit completed successfully (Result=${result:-unknown} ExecMainStatus=${exit_status:-unknown})"
+  fi
+}
+
 check_btrfs_subvolume() {
   local path="$1"
   if ! command -v btrfs >/dev/null 2>&1; then
@@ -287,6 +359,142 @@ check_write_behavior() {
   fi
 }
 
+check_managed_systemd_units() {
+  local source_file unit installed_file verify_output load_state load_unit
+  while IFS= read -r -d '' source_file; do
+    unit="$(basename -- "$source_file")"
+    if [[ "$PC_WORKER_ORCHESTRATION_ENABLE" != "true" ]] &&
+      [[ "$unit" == immich-ml-wake-proxy.service || "$unit" == tdarr-wake-monitor.service || "$unit" == tdarr-wake-monitor.timer ]]; then
+      continue
+    fi
+    installed_file="$(target_path "/etc/systemd/system/$unit")"
+    check_path_exists "$installed_file"
+    if [[ "$unit" == immich-ml-wake-proxy.service || "$unit" == tdarr-wake-monitor.service ]]; then
+      if [[ -f "$installed_file" ]] && cmp -s <(sed -E "s/^User=.*/User=$NAS_USER/" "$source_file") "$installed_file"; then
+        check_pass "$unit matches bootstrap source with configured user"
+      else
+        check_fail "$unit matches bootstrap source with configured user"
+      fi
+    else
+      check_file_matches_source "$source_file" "$installed_file" "$unit matches bootstrap source"
+    fi
+    if verify_output="$(check_run_target systemd-analyze verify --man=no "/etc/systemd/system/$unit" 2>&1)"; then
+      check_pass "$unit passes systemd-analyze verify"
+    else
+      printf '%s\n' "$verify_output"
+      check_fail "$unit passes systemd-analyze verify"
+    fi
+    if [[ "$TARGET_MODE" == "host" ]]; then
+      load_unit="$unit"
+      if [[ "$unit" == *@.service ]]; then
+        load_unit="${unit/@.service/@disk1.service}"
+      fi
+      load_state="$(systemctl show "$load_unit" -p LoadState --value 2>/dev/null || true)"
+      [[ "$load_state" == "loaded" ]] && check_pass "$load_unit is loaded by systemd" || check_fail "$load_unit is loaded by systemd (LoadState=${load_state:-unknown})"
+    fi
+  done < <(find "$NAS_ROOT/config/systemd" -maxdepth 1 -type f -print0 | LC_ALL=C sort -z)
+}
+
+check_managed_config_artifacts() {
+  local source_file source_name installed_path installed_file expected_mode
+  while IFS= read -r -d '' source_file; do
+    source_name="$(basename -- "$source_file")"
+    installed_path=""
+    expected_mode=""
+    case "$source_name" in
+    btrbk.conf.example) installed_path="/etc/btrbk/btrbk.conf" ;;
+    docker-daemon.json.example) installed_path="/etc/docker/daemon.json" ;;
+    nas-notify.env.example) installed_path="/etc/nas-notify.env.example"; expected_mode="600" ;;
+    smb.conf.example) installed_path="/etc/samba/smb.conf" ;;
+    snapraid.conf.example) installed_path="/etc/snapraid.conf" ;;
+    smartd.conf)
+      [[ "$SMART_ENABLE" == "true" ]] || continue
+      installed_path="/etc/smartd.conf"
+      ;;
+    btrfs-scrub.sh) installed_path="/usr/local/bin/nas-btrfs-scrub"; expected_mode="755" ;;
+    nas-secrets) installed_path="/usr/local/bin/nas-secrets"; expected_mode="755" ;;
+    snapraid-sync.sh | snapraid-scrub.sh) installed_path="/usr/local/bin/$source_name"; expected_mode="755" ;;
+    nas-*) installed_path="/usr/local/sbin/$source_name"; expected_mode="755" ;;
+    *)
+      check_fail "bootstrap config source has an explicit installed-artifact check: $source_name"
+      continue
+      ;;
+    esac
+    installed_file="$(target_path "$installed_path")"
+    if [[ "$source_name" == "smb.conf.example" ]]; then
+      if [[ -f "$installed_file" ]] && cmp -s <(sed "s|REPLACE_ME_SMB_INTERFACES|$SMB_INTERFACES|" "$source_file") "$installed_file"; then
+        check_pass "$installed_path matches bootstrap source with reviewed interfaces"
+      else
+        check_fail "$installed_path matches bootstrap source with reviewed interfaces"
+      fi
+    else
+      check_file_matches_source "$source_file" "$installed_file" "$installed_path matches bootstrap source"
+    fi
+    if [[ -n "$expected_mode" ]]; then
+      check_file_mode "$installed_file" "$expected_mode" "$installed_path mode is $expected_mode"
+    fi
+    if [[ "$expected_mode" == "755" ]]; then
+      check_script_syntax "$installed_path"
+    fi
+  done < <(find "$NAS_ROOT/config" -maxdepth 1 -type f -print0 | LC_ALL=C sort -z)
+
+  local mapping source_relative installed_relative mode
+  for mapping in \
+    "profile.d/nas-kernel-reminder.sh|/etc/profile.d/nas-kernel-reminder.sh|644" \
+    "zsh/zshrc|/etc/zsh/zshrc|644" \
+    "sysctl/99-ipv4-only.conf|/etc/sysctl.d/99-ipv4-only.conf|644" \
+    "network/nas-ipv4-ethernet.nmconnection|/etc/NetworkManager/system-connections/nas-ipv4-ethernet.nmconnection|600" \
+    "ssh/99-ipv4-only.conf|/etc/ssh/sshd_config.d/99-ipv4-only.conf|644"; do
+    IFS='|' read -r source_relative installed_relative mode <<<"$mapping"
+    installed_file="$(target_path "$installed_relative")"
+    check_file_matches_source "$NAS_ROOT/config/$source_relative" "$installed_file" "$installed_relative matches bootstrap source"
+    check_file_mode "$installed_file" "$mode" "$installed_relative mode is $mode"
+  done
+
+  check_managed_systemd_units
+}
+
+check_common_identity_and_base_os() {
+  local locale_output timezone_target group_output
+  check_symlink_target "$(target_path /etc/localtime)" "/usr/share/zoneinfo/$TIMEZONE" "timezone is $TIMEZONE"
+  check_file_contains_literal "$(target_path /etc/locale.conf)" "LANG=$LOCALE" "locale.conf selects $LOCALE"
+  locale_output="$(check_run_target locale -a 2>/dev/null || true)"
+  if grep -Eiq '^en_US[.]utf-?8$' <<<"$locale_output"; then
+    check_pass "$LOCALE locale is generated"
+  else
+    check_fail "$LOCALE locale is generated"
+  fi
+  check_file_contains_literal "$(target_path /etc/hostname)" "$NAS_HOSTNAME" "hostname file selects $NAS_HOSTNAME"
+  check_file_contains_literal "$(target_path /etc/hosts)" "127.0.1.1 $NAS_HOSTNAME.localdomain $NAS_HOSTNAME" "hosts file maps $NAS_HOSTNAME"
+  check_file_contains_literal "$(target_path /etc/sudoers.d/10-wheel)" "%wheel ALL=(ALL:ALL) ALL" "wheel sudo policy installed"
+  check_file_mode "$(target_path /etc/sudoers.d/10-wheel)" "440" "wheel sudo policy mode is 440"
+  check_file_contains_literal "$(target_path /etc/pacman.conf)" "IgnorePkg   = linux linux-headers" "pacman pins kernel and headers"
+  check_run_target id "$NAS_USER" >/dev/null 2>&1 && check_pass "$NAS_USER exists" || check_fail "$NAS_USER exists"
+  check_run_target getent group "$NAS_GROUP" >/dev/null 2>&1 && check_pass "$NAS_GROUP group exists" || check_fail "$NAS_GROUP group exists"
+  group_output="$(check_run_target id -nG "$NAS_USER" 2>/dev/null || true)"
+  grep -Eq '(^| )wheel( |$)' <<<"$group_output" && check_pass "$NAS_USER is in wheel" || check_fail "$NAS_USER is in wheel"
+  grep -Eq '(^| )docker( |$)' <<<"$group_output" && check_pass "$NAS_USER is in docker" || check_fail "$NAS_USER is in docker"
+  grep -Eq "(^| )$NAS_GROUP( |$)" <<<"$group_output" && check_pass "$NAS_USER is in $NAS_GROUP" || check_fail "$NAS_USER is in $NAS_GROUP"
+  check_unit_enabled NetworkManager true
+  if [[ "$TARGET_MODE" == "host" ]]; then
+    check_unit_active NetworkManager true
+    check_unit_not_failed NetworkManager
+    timezone_target="$(timedatectl show -p Timezone --value 2>/dev/null || true)"
+    [[ "$timezone_target" == "$TIMEZONE" ]] && check_pass "runtime timezone is $TIMEZONE" || check_fail "runtime timezone is $TIMEZONE"
+    [[ "$(sysctl -n net.ipv6.conf.all.disable_ipv6 2>/dev/null || true)" == "1" ]] && check_pass "IPv6 is disabled at runtime" || check_fail "IPv6 is disabled at runtime"
+    if nmcli -g NAME connection show 2>/dev/null | grep -Fxq "NAS IPv4 Ethernet"; then
+      check_pass "NAS IPv4 Ethernet profile is loaded"
+    else
+      check_fail "NAS IPv4 Ethernet profile is loaded"
+    fi
+    if sshd -t >/dev/null 2>&1; then
+      check_pass "sshd configuration parses"
+    else
+      check_fail "sshd configuration parses"
+    fi
+  fi
+}
+
 check_common_os_mounts() {
   check_mount_exists "$(active_mount_path /)"
   check_mount_exists "$(active_mount_path /home)"
@@ -305,13 +513,14 @@ check_common_os_mounts() {
 }
 
 check_common_data_mounts() {
-  local idx mountpoint directory subvol path
+  local idx mountpoint directory subvol path expected_mode
   for idx in "${!DATA_DISK_LABELS[@]}"; do
     mountpoint="$(active_mount_path "/mnt/disk$((idx + 1))")"
     check_mount_exists "$mountpoint"
     check_mount_fstype "$mountpoint" btrfs "$mountpoint is btrfs"
     check_dir_exists "$mountpoint/pool"
     check_dir_exists "$mountpoint/snapshots"
+    check_owner_mode "$mountpoint/pool" "$PUID:$PGID" "775" "$mountpoint/pool ownership and mode"
     for directory in "${POOL_DIRECTORIES[@]}"; do
       path="$mountpoint/pool/$directory"
       check_dir_exists "$path"
@@ -320,13 +529,21 @@ check_common_data_mounts() {
       else
         check_pass "$path is an ordinary protected directory"
       fi
+      case "$directory" in
+      .secrets-encrypted) expected_mode="700" ;;
+      personal | backups) expected_mode="2770" ;;
+      *) expected_mode="775" ;;
+      esac
+      check_owner_mode "$path" "$PUID:$PGID" "$expected_mode" "$path ownership and mode"
     done
     for subvol in "${POOL_SUBVOLUMES[@]}"; do
       path="$mountpoint/pool/$subvol"
       check_dir_exists "$path"
       check_btrfs_subvolume "$path"
+      check_owner_mode "$path" "$PUID:$PGID" "775" "$path ownership and mode"
     done
     check_dir_exists "$mountpoint/pool/media/torrents"
+    check_owner_mode "$mountpoint/pool/media/torrents" "$PUID:$PGID" "2775" "$mountpoint/pool/media/torrents ownership and mode"
     if [[ -L "$mountpoint/pool/secrets" ]] && [[ "$(readlink -- "$mountpoint/pool/secrets")" == /var/lib/nas-secrets/locked ]]; then
       check_pass "$mountpoint/pool/secrets uses the locked sentinel"
     elif mountpoint -q "$(active_mount_path "$MERGERFS_MOUNT/secrets")"; then
@@ -348,6 +565,7 @@ check_common_data_mounts() {
   check_mount_mergerfs_like "$(active_mount_path "$MERGERFS_MOUNT")" "$MERGERFS_MOUNT appears mergerfs-backed"
   check_mount_mergerfs_like "$(active_mount_path "$SNAPSHOT_VIEW_MOUNT")" "$SNAPSHOT_VIEW_MOUNT appears mergerfs-backed"
   check_path_exists "$(target_path /usr/local/bin/nas-secrets)"
+  check_owner_mode "$(target_path /var/lib/nas-secrets/locked)" "0:0" "555" "locked secrets sentinel ownership and mode"
   if [[ "$TARGET_MODE" == "live" ]]; then
     check_symlink_target \
       "$(active_mount_path "$MERGERFS_MOUNT/secrets")" \
@@ -393,7 +611,7 @@ check_common_pool_dirs() {
 }
 
 check_common_fstab() {
-  local fstab="$1" bad_fuse bad_fsname idx
+  local fstab="$1" bad_fuse bad_fsname idx label mountpoint expected_line
   bad_fuse="fuse.merger""fs"
   bad_fsname="fsname=merger""fs"
   check_path_exists "$fstab"
@@ -405,9 +623,15 @@ check_common_fstab() {
   check_mergerfs_mount_unit "$MERGERFS_MOUNT" pool
   check_mergerfs_mount_unit "$SNAPSHOT_VIEW_MOUNT" snapshots
   for idx in "${!DATA_DISK_LABELS[@]}"; do
-    check_no_duplicate_fstab_mount "$fstab" "/mnt/disk$((idx + 1))"
+    label="${DATA_DISK_LABELS[$idx]}"
+    mountpoint="/mnt/disk$((idx + 1))"
+    check_no_duplicate_fstab_mount "$fstab" "$mountpoint"
+    expected_line="LABEL=$label $mountpoint btrfs $BTRFS_DATA_FSTAB_OPTS 0 0"
+    check_file_contains_literal "$fstab" "$expected_line" "fstab has reviewed $mountpoint entry"
   done
   check_no_duplicate_fstab_mount "$fstab" "$PARITY_MOUNT"
+  expected_line="LABEL=$PARITY_LABEL $PARITY_MOUNT ext4 rw,noatime,nofail,x-systemd.device-timeout=10s 0 2"
+  check_file_contains_literal "$fstab" "$expected_line" "fstab has reviewed parity entry"
   check_no_duplicate_fstab_mount "$fstab" /
   check_no_duplicate_fstab_mount "$fstab" /home
   check_no_duplicate_fstab_mount "$fstab" /var/log
@@ -418,18 +642,17 @@ check_common_fstab() {
 
 check_common_packages() {
   local package
-  for package in grub efibootmgr intel-ucode snapper snap-pac docker docker-compose samba btrbk yay mergerfs snapraid informant nftables smartmontools nvme-cli rsync restic jq curl hdparm lsscsi sg3_utils wol fclones; do
+  check_package_installed base
+  for package in "${PACMAN_PACKAGES[@]}"; do
     check_package_installed "$package"
   done
-  [[ "$GRUB_BTRFS_ENABLE" == "true" ]] && check_package_installed grub-btrfs
-  if [[ "$ENABLE_UFW" == "true" ]]; then
-    check_package_installed ufw
+  for package in "${AUR_PACKAGES[@]}"; do
+    check_package_installed "$package"
+  done
+  if check_run_target pacman -Q ufw >/dev/null 2>&1; then
+    check_fail "ufw package is absent; nftables is the only host firewall"
   else
-    if check_run_target pacman -Q ufw >/dev/null 2>&1; then
-      check_fail "ufw package is not installed on NAS"
-    else
-      check_pass "ufw package is not installed on NAS"
-    fi
+    check_pass "ufw package is absent; nftables is the only host firewall"
   fi
 }
 
@@ -438,6 +661,7 @@ check_common_grub_snapper() {
   grub_config="$(target_path /boot/grub/grub.cfg)"
   snapper_config="$(target_path "/etc/snapper/configs/$SNAPPER_CONFIG_NAME")"
   check_path_exists "$grub_config"
+  check_path_exists "$(target_path "/boot/EFI/$GRUB_BOOTLOADER_ID/grubx64.efi")"
   check_file_contains_literal "$grub_config" "intel-ucode.img" "GRUB config references Intel microcode"
   check_file_contains_literal "$grub_config" "rootflags=subvol=@" "GRUB config uses rootflags=subvol=@"
   if [[ -f "$grub_config" ]] && grep -Eiq 'snapshot|snapper|grub-btrfs' "$grub_config"; then
@@ -463,6 +687,11 @@ check_common_grub_snapper() {
     else
       check_fail "snapper root config can be listed"
     fi
+    if check_run_target snapper --no-dbus -c "$SNAPPER_CONFIG_NAME" list 2>/dev/null | grep -Fq "$SNAPPER_INITIAL_SNAPSHOT_DESCRIPTION"; then
+      check_pass "initial Snapper snapshot exists"
+    else
+      check_fail "initial Snapper snapshot exists"
+    fi
     check_unit_enabled snapper-timeline.timer true
     check_unit_enabled snapper-cleanup.timer true
   fi
@@ -470,12 +699,19 @@ check_common_grub_snapper() {
 
 check_common_docker() {
   [[ "$DOCKER_ENABLE" == "true" ]] || return 0
-  local docker_override
+  local docker_override docker_daemon_config
   docker_override="$(target_path /etc/systemd/system/docker.service.d/wait-for-data.conf)"
+  docker_daemon_config="$(target_path /etc/docker/daemon.json)"
   check_path_exists "$docker_override"
   check_file_contains_literal "$docker_override" "RequiresMountsFor=$MERGERFS_MOUNT" "Docker waits for $MERGERFS_MOUNT"
   check_file_contains_literal "$docker_override" "After=network-online.target" "Docker waits for network-online target"
   check_file_contains_literal "$docker_override" "Docker published ports are explicit exposure" "Docker exposure stance documented"
+  check_path_exists "$docker_daemon_config"
+  if check_run_target jq -e . /etc/docker/daemon.json >/dev/null 2>&1; then
+    check_pass "Docker daemon configuration is valid JSON"
+  else
+    check_fail "Docker daemon configuration is valid JSON"
+  fi
   if [[ "$NAS_DOCKER_REPO_REQUIRED" == "true" ]]; then
     local active_docker_root repo_check_path
     active_docker_root="$(active_mount_path "$DOCKER_ROOT")"
@@ -489,6 +725,11 @@ check_common_docker() {
     else
       check_fail "nas-docker Git checkout is usable"
     fi
+    if [[ "$(check_run_target sudo -Hu "$NAS_USER" git -C "$repo_check_path" branch --show-current 2>/dev/null || true)" == "$NAS_DOCKER_REPO_BRANCH" ]]; then
+      check_pass "nas-docker Git checkout uses reviewed branch $NAS_DOCKER_REPO_BRANCH"
+    else
+      check_fail "nas-docker Git checkout uses reviewed branch $NAS_DOCKER_REPO_BRANCH"
+    fi
   fi
   check_unit_enabled docker true
   if [[ "$TARGET_MODE" == "host" ]]; then
@@ -497,12 +738,9 @@ check_common_docker() {
     else
       check_fail "systemctl cat docker includes mount dependency"
     fi
-    if [[ "$START_SERVICES_AFTER_ENABLE" == "true" ]]; then
-      systemctl is-active docker >/dev/null 2>&1 && check_pass "docker active" || check_fail "docker active"
-      docker info >/dev/null 2>&1 && check_pass "docker daemon responds" || check_fail "docker daemon responds"
-    else
-      systemctl is-active docker >/dev/null 2>&1 && check_pass "docker active" || check_warn "docker not active; START_SERVICES_AFTER_ENABLE=false"
-    fi
+    systemctl is-active docker >/dev/null 2>&1 && check_pass "docker active" || check_fail "docker active"
+    docker info >/dev/null 2>&1 && check_pass "docker daemon responds" || check_fail "docker daemon responds"
+    [[ "$(docker info --format '{{.LiveRestoreEnabled}}' 2>/dev/null || true)" == "true" ]] && check_pass "Docker live-restore is enabled" || check_fail "Docker live-restore is enabled"
   fi
 }
 
@@ -517,12 +755,19 @@ check_common_pc_worker_orchestration() {
   check_path_exists "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/immich-ml-wake-proxy.py"
   check_path_exists "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/tdarr-wake-monitor.sh"
   check_path_exists "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/pc-worker-ensure.sh"
-  local orchestrator_script
+  local orchestrator_script installed_orchestrator_path
   for orchestrator_script in immich-ml-wake-proxy.py nightly-pc-jobs.sh pc-worker-ensure.sh tdarr-wake-monitor.sh; do
+    installed_orchestrator_path="$DOCKER_COMPOSE_DIR/nightly-orchestrator/$orchestrator_script"
     check_symlink_target \
-      "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/$orchestrator_script" \
+      "$(active_mount_path "$installed_orchestrator_path")" \
       "../../nightly-orchestrator/$orchestrator_script" \
       "$orchestrator_script compatibility path uses tracked nas-docker source"
+    if [[ "$orchestrator_script" == *.sh ]]; then
+      check_file_mode "$(active_mount_path "$installed_orchestrator_path")" "755" "$orchestrator_script is executable"
+    else
+      check_file_mode "$(active_mount_path "$installed_orchestrator_path")" "644" "$orchestrator_script mode is 644"
+    fi
+    check_script_syntax "$installed_orchestrator_path"
   done
   check_file_contains_literal "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/tdarr-wake-monitor.sh" \
     "pc-auto-wake-boot-id" "PC shutdown requires matching automatic-wake boot ID"
@@ -622,6 +867,7 @@ check_common_snapraid_btrbk_samba() {
       check_warn "btrbk dryrun skipped in live target check"
     fi
     check_unit_enabled btrbk.timer true
+    check_unit_enabled nas-docker-state-backup.timer true
     check_dir_exists "$(active_mount_path /mnt/disk2)/pool/backups/docker-state/disk1"
     check_dir_exists "$(active_mount_path /mnt/disk3)/pool/backups/docker-state/disk2"
     check_dir_exists "$(active_mount_path /mnt/disk1)/pool/backups/docker-state/disk3"
@@ -637,6 +883,7 @@ check_common_snapraid_btrbk_samba() {
 
   if [[ "$SMB_ENABLE" == "true" ]]; then
     check_path_exists "$samba_conf"
+    check_file_contains_literal "$samba_conf" "interfaces = $SMB_INTERFACES" "Samba binds only reviewed interfaces"
     if check_run_target testparm -s /etc/samba/smb.conf >/dev/null 2>&1; then
       check_pass "Samba config parses"
     else
@@ -652,6 +899,55 @@ check_common_snapraid_btrbk_samba() {
   fi
 }
 
+check_enabled_runtime_units() {
+  local unit
+  local -a always_enabled=(
+    nas-kernel-maintenance-reminder.timer
+    nas-weekly-digest.timer
+    nas-recent-files.timer
+    nas-duplicate-report.timer
+    nas-uptime-ledger.timer
+    nas-container-health-alert.timer
+    nas-container-image-monitor.timer
+    nas-nextcloud-external-scan.timer
+    nas-btrfs-scrub-disk1.timer
+    nas-btrfs-scrub-disk2.timer
+    nas-btrfs-scrub-disk3.timer
+    nas-power-profile.service
+    nas-url-queue-notify.path
+  )
+  for unit in "${always_enabled[@]}"; do
+    check_unit_enabled "$unit" true
+  done
+  if [[ "$TARGET_MODE" == "host" ]]; then
+    for unit in "${always_enabled[@]}"; do
+      check_unit_not_failed "$unit"
+      check_unit_active "$unit" true
+    done
+    if [[ "$SMB_ENABLE" == "true" ]]; then
+      check_unit_active smb true
+      check_unit_active nmb true
+      check_unit_not_failed smb
+      check_unit_not_failed nmb
+    fi
+    if [[ "$SNAPRAID_ENABLE" == "true" ]]; then
+      check_unit_active snapraid-sync.timer true
+      check_unit_active snapraid-scrub.timer true
+    fi
+    if [[ "$BTRBK_ENABLE" == "true" ]]; then
+      check_unit_active btrbk.timer true
+      check_unit_active nas-docker-state-backup.timer true
+    fi
+    if [[ "$SNAPPER_ENABLE" == "true" ]]; then
+      check_unit_active snapper-timeline.timer true
+      check_unit_active snapper-cleanup.timer true
+    fi
+    if [[ "$GRUB_BTRFS_ENABLE" == "true" ]]; then
+      check_unit_active grub-btrfsd.service true
+    fi
+  fi
+}
+
 check_common_services() {
   check_unit_enabled sshd true
   if [[ "$TARGET_MODE" == "host" ]]; then
@@ -660,6 +956,8 @@ check_common_services() {
   if [[ "$TAILSCALE_ENABLE" == "true" ]]; then
     check_unit_enabled tailscaled true
     if [[ "$TARGET_MODE" == "host" ]]; then
+      check_unit_active tailscaled true
+      check_unit_not_failed tailscaled
       tailscale status >/dev/null 2>&1 && check_pass "Tailscale status available" || check_warn "Tailscale may not be authenticated yet"
     fi
   fi
@@ -667,22 +965,25 @@ check_common_services() {
   if [[ "$TARGET_MODE" == "host" ]]; then
     check_unit_active systemd-timesyncd.service true
   fi
-  if [[ "$ENABLE_UFW" == "true" ]]; then
-    check_unit_enabled ufw.service true
-    if [[ "$TARGET_MODE" == "host" ]]; then
-      check_unit_not_failed ufw.service
-      check_unit_active ufw.service true
-    fi
-  fi
   if [[ "$FIREWALL_ENABLE" == "true" ]]; then
     check_path_exists "$(target_path /etc/nftables.conf)"
     check_unit_enabled nftables.service true
+    local firewall_cidr
+    for firewall_cidr in $FIREWALL_LAN_CIDRS; do
+      check_file_contains_literal "$(target_path /etc/nftables.conf)" "$firewall_cidr" "nftables includes reviewed network $firewall_cidr"
+    done
+    if check_run_target nft -c -f /etc/nftables.conf >/dev/null 2>&1; then
+      check_pass "nftables config validates"
+    else
+      check_fail "nftables config validates"
+    fi
     if [[ "$TARGET_MODE" == "host" ]]; then
       check_unit_not_failed nftables.service
-      if check_run_target nft -c -f /etc/nftables.conf >/dev/null 2>&1; then
-        check_pass "nftables config validates"
+      check_oneshot_succeeded nftables.service
+      if check_run_target nft list table inet filter >/dev/null 2>&1; then
+        check_pass "nftables inet filter table is loaded"
       else
-        check_fail "nftables config validates"
+        check_fail "nftables inet filter table is loaded"
       fi
       if check_run_target nft list ruleset >/dev/null 2>&1; then
         check_pass "nft list ruleset succeeds"
@@ -709,6 +1010,14 @@ check_common_services() {
   check_file_contains_literal "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)" "SystemMaxUse=$JOURNALD_SYSTEM_MAX_USE" "journald SystemMaxUse configured"
   check_file_contains_literal "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)" "RuntimeMaxUse=$JOURNALD_RUNTIME_MAX_USE" "journald RuntimeMaxUse configured"
   check_file_contains_literal "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)" "MaxRetentionSec=$JOURNALD_MAX_RETENTION_SEC" "journald MaxRetentionSec configured"
+  check_path_exists "$(target_path /etc/default/nas-storage)"
+  check_file_contains_literal "$(target_path /etc/default/nas-storage)" "PARITY_DISK=$PARITY_DISK" "nas-storage records reviewed parity disk"
+  check_file_contains_literal "$(target_path /etc/default/nas-storage)" "NAS_USER=$NAS_USER" "nas-storage records configured NAS user"
+  check_file_contains_literal "$(target_path /etc/default/nas-storage)" "NAS_GROUP=$NAS_GROUP" "nas-storage records configured NAS group"
+  check_file_contains_literal "$(target_path /etc/default/nas-storage)" "NAS_TIMEZONE=$TIMEZONE" "nas-storage records configured timezone"
+  check_file_contains_literal "$(target_path /etc/default/nas-storage)" "NAS_UPTIME_BASELINE=$NAS_UPTIME_BASELINE" "nas-storage records uptime baseline policy"
+  check_file_contains_literal "$(target_path /usr/local/sbin/nas-uptime-ledger)" "storage_setting(\"PARITY_DISK\"" "uptime ledger uses reviewed parity disk config"
+  check_file_contains_literal "$(target_path /usr/local/sbin/nas-uptime-ledger)" "storage_setting(\"NAS_UPTIME_BASELINE\"" "uptime ledger uses reviewed baseline policy"
   check_path_exists "$(target_path /etc/profile.d/nas-kernel-reminder.sh)"
   check_file_contains_literal "$(target_path /etc/profile.d/nas-kernel-reminder.sh)" "IgnorePkg includes linux/linux-headers" "kernel reminder documents pacman pin"
   check_path_exists "$(target_path /usr/local/sbin/nas-kernel-maintenance-reminder)"
@@ -788,6 +1097,7 @@ check_common_services() {
   if [[ "$GRUB_BTRFS_ENABLE" == "true" ]]; then
     check_unit_enabled grub-btrfsd.service false
   fi
+  check_enabled_runtime_units
 }
 
 check_mount_a_and_findmnt_verify() {
@@ -827,11 +1137,13 @@ check_live_target() {
   findmnt "$TARGET_ROOT" >/dev/null 2>&1 && check_pass "$TARGET_ROOT is mounted" || check_fail "$TARGET_ROOT is mounted"
   ensure_live_mergerfs_healthy
   check_mount_exists "$(target_path /boot)"
+  check_common_identity_and_base_os
   check_common_os_mounts
   check_common_data_mounts
   check_common_pool_dirs
   check_common_fstab "$(target_path /etc/fstab)"
   check_common_packages
+  check_managed_config_artifacts
   check_common_grub_snapper
   check_common_docker
   check_common_pc_worker_orchestration
@@ -850,11 +1162,7 @@ check_health() {
   check_path_exists /etc/fstab
   check_path_exists /boot/grub/grub.cfg
   [[ "$(hostname)" == "$NAS_HOSTNAME" ]] && check_pass "hostname matches $NAS_HOSTNAME" || check_fail "hostname matches $NAS_HOSTNAME"
-  id "$NAS_USER" >/dev/null 2>&1 && check_pass "$NAS_USER exists" || check_fail "$NAS_USER exists"
-  getent group "$NAS_GROUP" >/dev/null 2>&1 && check_pass "$NAS_GROUP group exists" || check_fail "$NAS_GROUP group exists"
-  id -nG "$NAS_USER" 2>/dev/null | grep -Eq "(^| )wheel( |$)" && check_pass "$NAS_USER is in wheel" || check_fail "$NAS_USER is in wheel"
-  id -nG "$NAS_USER" 2>/dev/null | grep -Eq "(^| )docker( |$)" && check_pass "$NAS_USER is in docker" || check_fail "$NAS_USER is in docker"
-  id -nG "$NAS_USER" 2>/dev/null | grep -Eq "(^| )$NAS_GROUP( |$)" && check_pass "$NAS_USER is in $NAS_GROUP" || check_fail "$NAS_USER is in $NAS_GROUP"
+  check_common_identity_and_base_os
   check_device_fstype_label "$EFI_PARTITION" vfat "" "$EFI_PARTITION"
   check_device_fstype_label "$ROOT_PARTITION" btrfs arch-root "$ROOT_PARTITION"
   local idx
@@ -869,6 +1177,7 @@ check_health() {
   check_common_fstab /etc/fstab
   check_mount_a_and_findmnt_verify
   check_common_packages
+  check_managed_config_artifacts
   check_common_grub_snapper
   check_common_docker
   check_common_pc_worker_orchestration

@@ -105,10 +105,26 @@ After rebooting without the ISO, the installed VM runs:
 sudo nas/qemu/checks/verify-installed-health.sh /root/bootstrap/nas/qemu/qemu-nas.env
 ```
 
-Success means the VM boots from GRUB, `/data` and `/mnt/snapshots` are mounted
-exactly once, `/data` is writable, `/mnt/snapshots` rejects writes, Docker
-waits for `/data`, SnapRAID/btrbk/Snapper are configured, and the final health
-check reports no failures.
+The checks are source-driven where possible. Every official and AUR package in
+the bootstrap arrays must be installed, UFW must be absent, every managed
+config/script/systemd unit must match its bootstrap source (allowing only
+reviewed substitutions), scripts must parse, and systemd must load and verify
+every unit. The harness also checks host identity, users/groups, locale,
+timezone, networking, IPv4-only settings, GRUB and the initial Snapper
+snapshot, exact filesystem labels/mounts/options/permissions, mergerfs write
+behavior, SnapRAID and btrbk topology, the nftables live rules table, Samba on
+the QEMU guest address, Docker live-restore and repository branch, and all
+enabled services/timers.
+
+Finally, safe smoke tests execute the installed health-alert, uptime-ledger,
+recent-files, duplicate-report, and weekly-digest helpers without delivering
+notifications. Success requires both pre-reboot and post-reboot health checks
+to report zero failures, no failed systemd units, and a clean QEMU shutdown.
+
+QEMU cannot prove hardware-only SMART reporting or SATA standby behavior, and
+a tracked Git bundle cannot contain ignored Compose environments, databases,
+appdata, notification credentials, or gocryptfs keys. Those remain explicit
+post-install restore and real-hardware checks.
 
 Logs are written under:
 

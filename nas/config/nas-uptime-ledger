@@ -3,6 +3,7 @@
 
 import json
 import os
+import shlex
 import subprocess
 import tempfile
 import time
@@ -12,9 +13,6 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 
-# The initial boot installed the NAS OS. Track availability from the first
-# normal boot immediately afterward.
-BASELINE = datetime(2026, 7, 8, 0, 30, 59, tzinfo=timezone.utc)
 STATE_DIR = Path("/var/lib/nas-uptime")
 STATE_FILE = STATE_DIR / "state.json"
 STATUS_FILE = STATE_DIR / "status.json"
@@ -25,8 +23,23 @@ DATA_DISK_PATHS = {
     f"disk{disk}": Path(f"/mnt/disk{disk}/pool") for disk in range(1, 4)
 }
 SNAPSHOT_ROOTS = [Path(f"/mnt/disk{disk}/snapshots") for disk in range(1, 4)]
-SNAPSHOT_TIMEZONE = ZoneInfo("America/Los_Angeles")
-PARITY_DISK = Path("/dev/disk/by-id/ata-WDC_WD40EFZZ-68CPAN0_WD-WX12D165E9LY")
+STORAGE_CONFIG = Path("/etc/default/nas-storage")
+
+
+def storage_setting(name: str, default: str) -> str:
+    if not STORAGE_CONFIG.exists():
+        return default
+    for line in STORAGE_CONFIG.read_text().splitlines():
+        key, separator, value = line.partition("=")
+        if separator and key == name:
+            parsed = shlex.split(value)
+            return parsed[0] if parsed else default
+    return default
+
+
+PARITY_DISK = Path(storage_setting("PARITY_DISK", "/dev/null"))
+BASELINE_SETTING = storage_setting("NAS_UPTIME_BASELINE", "auto")
+SNAPSHOT_TIMEZONE = ZoneInfo(storage_setting("NAS_TIMEZONE", "UTC"))
 PARITY_STANDBY_TIMEOUT_MINUTES = 30
 PARITY_SPINDOWN_SERVICE = "nas-parity-spindown.service"
 MAINTENANCE_UNITS = {
@@ -51,12 +64,11 @@ def boot_epoch() -> int:
     raise RuntimeError("unable to determine current boot time")
 
 
-def journal_seed(now: int, current_boot: str, current_boot_epoch: int) -> int:
+def journal_seed(now: int, current_boot: str, current_boot_epoch: int, baseline_epoch: int) -> int:
     """Sum retained completed boots, then the current boot, from the baseline."""
     output = subprocess.check_output(
         ["journalctl", "--list-boots", "--no-pager", "--utc"], text=True
     )
-    baseline_epoch = int(BASELINE.timestamp())
     total = 0
     first_record = True
     for line in output.splitlines()[1:]:
@@ -440,11 +452,16 @@ def incidents(maintenance: dict[str, dict]) -> list[dict]:
 def main() -> None:
     STATE_DIR.mkdir(mode=0o755, parents=True, exist_ok=True)
     now = int(time.time())
-    baseline_epoch = int(BASELINE.timestamp())
     current_boot = boot_id()
     current_boot_epoch = boot_epoch()
 
     previous_state = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else {}
+    if previous_state.get("baseline_epoch"):
+        baseline_epoch = int(previous_state["baseline_epoch"])
+    elif BASELINE_SETTING == "auto":
+        baseline_epoch = current_boot_epoch
+    else:
+        baseline_epoch = int(datetime.fromisoformat(BASELINE_SETTING.replace("Z", "+00:00")).timestamp())
     if previous_state:
         state = previous_state
         online_seconds = int(state["online_seconds"])
@@ -454,7 +471,7 @@ def main() -> None:
         else:
             online_seconds += max(0, now - max(current_boot_epoch, baseline_epoch))
     else:
-        online_seconds = journal_seed(now, current_boot, current_boot_epoch)
+        online_seconds = journal_seed(now, current_boot, current_boot_epoch, baseline_epoch)
 
     data_pool, history = data_pool_history(previous_state, now)
     data_disks, disk_histories = data_disk_samples(previous_state, now)
@@ -485,7 +502,7 @@ def main() -> None:
         "generated_at": datetime.fromtimestamp(now, timezone.utc).isoformat().replace("+00:00", "Z"),
         "availability_display": f"{availability_ratio * 100:.3f}%",
         "availability_ratio": availability_ratio,
-        "baseline": BASELINE.isoformat().replace("+00:00", "Z"),
+        "baseline": datetime.fromtimestamp(baseline_epoch, timezone.utc).isoformat().replace("+00:00", "Z"),
         "current_boot_seconds": max(0, now - current_boot_epoch),
         "elapsed_seconds": elapsed_seconds,
         "online_seconds": online_seconds,

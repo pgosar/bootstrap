@@ -218,7 +218,10 @@ validate_config() {
     required+=(OS_DISK PARITY_DISK PARITY_LABEL PARITY_MOUNT MERGERFS_MOUNT SNAPSHOT_VIEW_MOUNT BTRFS_DATA_MOUNT_OPTS BTRFS_DATA_FSTAB_OPTS MERGERFS_MIN_FREE_SPACE MERGERFS_CREATE_POLICY)
   fi
   if [[ "$SERVICES" == true || "$ENABLE_SERVICES" == true ]]; then
-    required+=(DOCKER_ROOT DOCKER_COMPOSE_DIR DOCKER_APPDATA_DIR)
+    required+=(DOCKER_ROOT DOCKER_COMPOSE_DIR DOCKER_APPDATA_DIR NAS_DOCKER_REPO_BRANCH NAS_UPTIME_BASELINE)
+    if [[ "$SMB_ENABLE" == "true" ]]; then
+      required+=(SMB_INTERFACES)
+    fi
   fi
   for name in "${required[@]}"; do
     require_non_placeholder_var "$name"
@@ -238,6 +241,12 @@ validate_config() {
   [[ "$BOOTLOADER" == "grub" ]] || die "BOOTLOADER must be grub"
   [[ "$INSTALL_INTEL_UCODE" == "true" ]] || die "INSTALL_INTEL_UCODE must be true for this Intel NAS"
   [[ "$SNAPPER_CONFIG_NAME" == "root" ]] || die "SNAPPER_CONFIG_NAME must be root"
+  if [[ "$NAS_UPTIME_BASELINE" != "auto" ]]; then
+    date -d "$NAS_UPTIME_BASELINE" +%s >/dev/null 2>&1 || die "NAS_UPTIME_BASELINE must be auto or an ISO-8601 timestamp"
+  fi
+  if [[ "$SMB_ENABLE" == "true" ]]; then
+    [[ "$SMB_INTERFACES" =~ ^[0-9.[:space:]]+$ ]] || die "SMB_INTERFACES must contain reviewed IPv4 addresses separated by spaces"
+  fi
   if [[ "$INSTALL_ARCH" == true || "$STORAGE" == true ]]; then
     [[ "$DISK_LAYOUT_REVIEWED" == "true" ]] || die "Set DISK_LAYOUT_REVIEWED=true in .env after reviewing OS/data/parity disk mapping."
   fi

@@ -20,9 +20,11 @@ configure_operations_basics() {
   run chmod 0755 "$(target_path /usr/local/sbin/nas-parity-spindown)"
   copy_with_backup "$NAS_ROOT/config/systemd/nas-parity-spindown.service" "$(target_path /etc/systemd/system/nas-parity-spindown.service)"
   write_text "$(target_path /etc/default/nas-storage)" \
-    "PARITY_DISK=$(printf '%q' "$PARITY_DISK")"$'\n'\
+"PARITY_DISK=$(printf '%q' "$PARITY_DISK")"$'\n'\
 "NAS_USER=$(printf '%q' "$NAS_USER")"$'\n'\
-"NAS_GROUP=$(printf '%q' "$NAS_GROUP")"$'\n'
+"NAS_GROUP=$(printf '%q' "$NAS_GROUP")"$'\n'\
+"NAS_TIMEZONE=$(printf '%q' "$TIMEZONE")"$'\n'\
+"NAS_UPTIME_BASELINE=$(printf '%q' "$NAS_UPTIME_BASELINE")"$'\n'
   copy_with_backup "$NAS_ROOT/config/nas-kernel-maintenance-reminder" "$(target_path /usr/local/sbin/nas-kernel-maintenance-reminder)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-kernel-maintenance-reminder)"
   copy_with_backup "$NAS_ROOT/config/systemd/nas-kernel-maintenance-reminder.service" "$(target_path /etc/systemd/system/nas-kernel-maintenance-reminder.service)"
@@ -266,12 +268,12 @@ configure_docker() {
         local staged_repo_source="/var/tmp/nas-docker-source.bundle"
         run install -m 0600 "$NAS_DOCKER_REPO_SOURCE" "$(target_path "$staged_repo_source")"
         target_run chown "$NAS_USER:$NAS_GROUP" "$staged_repo_source"
-        target_run sudo -Hu "$NAS_USER" git clone --no-hardlinks "$staged_repo_source" "$DOCKER_ROOT"
+        target_run sudo -Hu "$NAS_USER" git clone --no-hardlinks --branch "$NAS_DOCKER_REPO_BRANCH" "$staged_repo_source" "$DOCKER_ROOT"
         run rm -f "$(target_path "$staged_repo_source")"
       elif [[ "$TARGET_MODE" == "live" && -e "$NAS_DOCKER_REPO_SOURCE" ]]; then
         die "live-mode local NAS_DOCKER_REPO_SOURCE must be a git bundle file; use git bundle create or a clone URL"
       else
-        target_run sudo -Hu "$NAS_USER" git clone --no-hardlinks "$NAS_DOCKER_REPO_SOURCE" "$DOCKER_ROOT"
+        target_run sudo -Hu "$NAS_USER" git clone --no-hardlinks --branch "$NAS_DOCKER_REPO_BRANCH" "$NAS_DOCKER_REPO_SOURCE" "$DOCKER_ROOT"
       fi
     elif [[ "$APPLY" != true ]]; then
       log "+ ensure nas-docker checkout at $(printf '%q' "$active_docker_root") from $(printf '%q' "$NAS_DOCKER_REPO_SOURCE")"
@@ -279,6 +281,8 @@ configure_docker() {
     if [[ "$APPLY" == true ]]; then
       target_run_capture sudo -Hu "$NAS_USER" git -C "$repo_check_path" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
         || die "$active_docker_root is not a usable nas-docker Git checkout"
+      [[ "$(target_run_capture sudo -Hu "$NAS_USER" git -C "$repo_check_path" branch --show-current)" == "$NAS_DOCKER_REPO_BRANCH" ]] \
+        || die "$active_docker_root is not on reviewed branch $NAS_DOCKER_REPO_BRANCH"
     fi
   fi
   ensure_dir "$active_compose"
@@ -354,6 +358,10 @@ configure_pc_worker_orchestration() {
 configure_samba() {
   log "Phase: Samba config"
   copy_with_backup "$NAS_ROOT/config/smb.conf.example" "$(target_path /etc/samba/smb.conf)"
+  log "+ set reviewed Samba interfaces in $(target_path /etc/samba/smb.conf)"
+  if [[ "$APPLY" == true ]]; then
+    sed -i "s|REPLACE_ME_SMB_INTERFACES|$SMB_INTERFACES|" "$(target_path /etc/samba/smb.conf)"
+  fi
   if target_command_available testparm; then
     target_run testparm -s /etc/samba/smb.conf
   else
@@ -395,13 +403,6 @@ enable_services() {
       target_run systemctl start nftables
     fi
   fi
-  if [[ "$ENABLE_UFW" == "true" ]]; then
-    target_run systemctl enable ufw
-    if [[ "$START_SERVICES" == true && "$TARGET_MODE" == "host" ]]; then
-      target_run systemctl start ufw
-    fi
-  fi
-
   target_run systemctl enable systemd-timesyncd.service
   target_run systemctl enable nas-kernel-maintenance-reminder.timer
   target_run systemctl enable nas-weekly-digest.timer
