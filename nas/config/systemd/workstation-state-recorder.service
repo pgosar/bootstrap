@@ -1,0 +1,16 @@
+[Unit]
+Description=Record the NAS software and hardware state
+RequiresMountsFor=/data/personal
+After=local-fs.target docker.service
+
+[Service]
+Type=oneshot
+User=__STATE_USER__
+Group=__STATE_GROUP__
+Environment=WORKSTATION_STATE_ROOT=/data/personal/system-state
+ExecStart=/usr/local/bin/workstation-state-recorder nas /data/personal/system-state
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

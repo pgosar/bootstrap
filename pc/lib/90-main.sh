@@ -75,6 +75,7 @@ enable_services() {
     [[ "$ENABLE_FSTRIM_TIMER" == "true" ]] && enable_target_unit fstrim.timer
     enable_target_unit snapper-cleanup.timer
     enable_target_unit snapper-timeline.timer false
+    enable_target_unit workstation-state-recorder.timer
     [[ "$ENABLE_SMARTD" == "true" ]] && enable_target_unit smartd
     [[ "$ENABLE_NFTABLES" == "true" ]] && enable_target_unit nftables
   else

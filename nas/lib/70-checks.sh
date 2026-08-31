@@ -904,6 +904,7 @@ check_enabled_runtime_units() {
   local -a always_enabled=(
     nas-kernel-maintenance-reminder.timer
     nas-weekly-digest.timer
+    workstation-state-recorder.timer
     nas-recent-files.timer
     nas-duplicate-report.timer
     nas-uptime-ledger.timer
@@ -1061,6 +1062,13 @@ check_common_services() {
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-weekly-digest)" "docker logs" "weekly digest scans Docker logs"
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-weekly-digest)" "CRITICAL NAS ALERTS" "weekly digest emphasizes critical alerts"
   check_unit_enabled nas-weekly-digest.timer true
+  check_path_exists "$(target_path /usr/local/bin/workstation-state-recorder)"
+  check_path_exists "$(target_path /usr/local/bin/state-diff)"
+  check_path_exists "$(target_path /etc/systemd/system/workstation-state-recorder.service)"
+  check_path_exists "$(target_path /etc/systemd/system/workstation-state-recorder.timer)"
+  check_file_contains_literal "$(target_path /etc/systemd/system/workstation-state-recorder.service)" "User=$NAS_USER" "state recorder runs as the NAS operator"
+  check_file_contains_literal "$(target_path /usr/local/bin/workstation-state-recorder)" "write_etc_hashes" "state recorder hashes selected /etc files"
+  check_unit_enabled workstation-state-recorder.timer true
   check_path_exists "$(target_path /usr/local/sbin/nas-container-health-alert)"
   check_path_exists "$(target_path /etc/systemd/system/nas-container-health-alert.timer)"
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-container-health-alert)" "docker-health" "container health transitions use NAS notifications"

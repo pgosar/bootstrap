@@ -1,0 +1,246 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: workstation-state-recorder HOST STATE_ROOT
+
+Create a secret-safe, timestamped host inventory below STATE_ROOT/HOST.
+If WORKSTATION_STATE_SYNC_TARGET is set, synchronize the host directory to
+that rsync destination after recording it.
+EOF
+}
+
+[[ $# -eq 2 ]] || { usage >&2; exit 2; }
+readonly HOST_LABEL="$1"
+readonly STATE_ROOT="$2"
+[[ "$HOST_LABEL" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || {
+  printf 'invalid host label: %s\n' "$HOST_LABEL" >&2
+  exit 2
+}
+[[ "$STATE_ROOT" == /* ]] || {
+  printf 'state root must be an absolute path: %s\n' "$STATE_ROOT" >&2
+  exit 2
+}
+
+umask 077
+readonly HOST_ROOT="$STATE_ROOT/$HOST_LABEL"
+readonly TIMESTAMP="$(date -u +%Y-%m-%dT%H%M%SZ)"
+readonly FINAL_DIR="$HOST_ROOT/$TIMESTAMP"
+mkdir -p "$HOST_ROOT"
+[[ ! -e "$FINAL_DIR" ]] || {
+  printf 'snapshot already exists: %s\n' "$FINAL_DIR" >&2
+  exit 1
+}
+tmp_dir="$(mktemp -d "$HOST_ROOT/.recording.XXXXXX")"
+trap 'rm -rf "$tmp_dir"' EXIT
+
+command_exists() { command -v "$1" >/dev/null 2>&1; }
+
+write_metadata() {
+  {
+    printf 'captured_at\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf 'host_label\t%s\n' "$HOST_LABEL"
+    printf 'hostname\t%s\n' "$(hostname)"
+    printf 'machine_id_hash\t%s\n' "$(sha256sum /etc/machine-id 2>/dev/null | awk '{print $1}')"
+    printf 'recorder_version\t1\n'
+  } >"$tmp_dir/metadata.tsv"
+}
+
+write_packages() {
+  if command_exists pacman; then
+    pacman -Qn | awk '{print $1 "\t" $2}' | LC_ALL=C sort >"$tmp_dir/packages.tsv"
+    pacman -Qm | awk '{print $1 "\t" $2}' | LC_ALL=C sort >"$tmp_dir/aur-packages.tsv"
+  else
+    : >"$tmp_dir/packages.tsv"
+    : >"$tmp_dir/aur-packages.tsv"
+  fi
+}
+
+write_services() {
+  systemctl list-unit-files --type=service --state=enabled --no-legend --no-pager 2>/dev/null |
+    awk 'NF >= 2 {print $1 "\t" $2}' | LC_ALL=C sort >"$tmp_dir/system-services.tsv" || true
+  systemctl --user list-unit-files --type=service --state=enabled --no-legend --no-pager 2>/dev/null |
+    awk 'NF >= 2 {print $1 "\t" $2}' | LC_ALL=C sort >"$tmp_dir/user-services.tsv" || true
+}
+
+write_kernel() {
+  {
+    printf 'running\t%s\n' "$(uname -r)"
+    if command_exists pacman; then
+      pacman -Q 2>/dev/null | awk '$1 ~ /^linux([0-9]+|-(lts|zen|hardened))?$/ || $1 ~ /^linux-firmware/ || $1 ~ /^(amd|intel)-ucode$/ {print "package:" $1 "\t" $2}'
+    fi
+  } | LC_ALL=C sort >"$tmp_dir/kernel.tsv"
+}
+
+write_gpu() {
+  : >"$tmp_dir/gpu.tsv"
+  if command_exists lspci; then
+    lspci -Dnnk 2>/dev/null | awk '
+      /^[0-9a-fA-F:.]+ .*(VGA compatible controller|3D controller|Display controller)/ {
+        device=$1; $1=""; sub(/^ /, ""); print "device:" device "\t" $0; capture=1; next
+      }
+      capture && /^[[:space:]]+Kernel driver in use:/ {
+        line=$0; sub(/^[[:space:]]+Kernel driver in use:[[:space:]]*/, "", line)
+        print "driver:" device "\t" line; next
+      }
+      capture && !/^[[:space:]]/ {capture=0}
+    ' >>"$tmp_dir/gpu.tsv"
+  fi
+  if command_exists pacman; then
+    pacman -Q 2>/dev/null | awk '$1 ~ /^(nvidia|mesa|vulkan|xf86-video|libva)/ {print "package:" $1 "\t" $2}' >>"$tmp_dir/gpu.tsv"
+  fi
+  LC_ALL=C sort -o "$tmp_dir/gpu.tsv" "$tmp_dir/gpu.tsv"
+}
+
+write_storage() {
+  : >"$tmp_dir/disks.tsv"
+  : >"$tmp_dir/mounts.tsv"
+  if command_exists lsblk; then
+    lsblk -dn -o NAME,TYPE,SIZE,MODEL,REV,TRAN 2>/dev/null |
+      awk '{name=$1; $1=""; sub(/^ /, ""); print name "\t" $0}' |
+      LC_ALL=C sort >"$tmp_dir/disks.tsv"
+  fi
+  if command_exists findmnt; then
+    findmnt -rn -o TARGET,SOURCE,FSTYPE 2>/dev/null |
+      awk '$NF !~ /^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|overlay|proc|pstore|ramfs|securityfs|sysfs|tmpfs|tracefs)$/ {target=$1; $1=""; sub(/^ /, ""); gsub(/UUID=[^ ]+/, "UUID=redacted"); gsub(/\/dev\/disk\/by-uuid\/[^ ]+/, "/dev/disk/by-uuid/redacted"); print target "\t" $0}' |
+      LC_ALL=C sort >"$tmp_dir/mounts.tsv"
+  fi
+}
+
+write_etc_hashes() {
+  local path file hash mode owner group
+  local -a roots=(
+    /etc/fstab
+    /etc/crypttab
+    /etc/pacman.conf
+    /etc/mkinitcpio.conf
+    /etc/default/grub
+    /etc/hostname
+    /etc/hosts
+    /etc/locale.conf
+    /etc/vconsole.conf
+    /etc/nftables.conf
+    /etc/docker/daemon.json
+    /etc/modprobe.d
+    /etc/sysctl.d
+    /etc/systemd/system
+    /etc/udev/rules.d
+    /etc/pacman.d/hooks
+    /etc/mkinitcpio.d
+    /etc/snapper/configs
+  )
+  : >"$tmp_dir/etc-files.tsv"
+  for path in "${roots[@]}"; do
+    [[ -e "$path" ]] || continue
+    while IFS= read -r -d '' file; do
+      mode="$(stat -c '%a' "$file" 2>/dev/null || printf '?')"
+      owner="$(stat -c '%U' "$file" 2>/dev/null || printf '?')"
+      group="$(stat -c '%G' "$file" 2>/dev/null || printf '?')"
+      hash="$(sha256sum "$file" 2>/dev/null | awk '{print $1}' || true)"
+      [[ -n "$hash" ]] || hash=unreadable
+      printf '%s\tsha256=%s mode=%s owner=%s group=%s\n' "$file" "$hash" "$mode" "$owner" "$group" >>"$tmp_dir/etc-files.tsv"
+    done < <(
+      if [[ -f "$path" ]]; then
+        printf '%s\0' "$path"
+      elif [[ -d "$path" ]]; then
+        find "$path" -xdev -type f -print0 2>/dev/null
+      fi
+    )
+  done
+  LC_ALL=C sort -o "$tmp_dir/etc-files.tsv" "$tmp_dir/etc-files.tsv"
+}
+
+write_flatpaks() {
+  : >"$tmp_dir/flatpaks.tsv"
+  if command_exists flatpak; then
+    flatpak list --app --columns=application,branch,version,origin 2>/dev/null |
+      awk -F '\t' 'NF {key=$1; value=$0; sub(/^[^\t]*\t?/, "", value); print key "\t" value}' |
+      LC_ALL=C sort >"$tmp_dir/flatpaks.tsv" || true
+  fi
+}
+
+write_docker() {
+  : >"$tmp_dir/docker-containers.tsv"
+  if command_exists docker && docker info >/dev/null 2>&1; then
+    while IFS= read -r container; do
+      [[ -n "$container" ]] || continue
+      docker inspect --format '{{.Name}}\timage={{.Config.Image}} image_id={{.Image}} restart={{.HostConfig.RestartPolicy.Name}} network={{.HostConfig.NetworkMode}}' "$container" 2>/dev/null |
+        sed 's#^/##'
+    done < <(docker ps -aq 2>/dev/null) | LC_ALL=C sort >"$tmp_dir/docker-containers.tsv"
+  fi
+}
+
+write_firmware() {
+  local key value iface
+  : >"$tmp_dir/firmware.tsv"
+  for key in bios_vendor bios_version bios_date board_vendor board_name product_name; do
+    if [[ -r "/sys/class/dmi/id/$key" ]]; then
+      value="$(tr -d '\n' <"/sys/class/dmi/id/$key")"
+      printf 'dmi:%s\t%s\n' "$key" "$value" >>"$tmp_dir/firmware.tsv"
+    fi
+  done
+  if command_exists ethtool; then
+    for iface in /sys/class/net/*; do
+      [[ -e "$iface/device" ]] || continue
+      iface="${iface##*/}"
+      ethtool -i "$iface" 2>/dev/null | awk -F ': ' -v iface="$iface" '$1 == "driver" || $1 == "version" || $1 == "firmware-version" {print "net:" iface ":" $1 "\t" $2}' >>"$tmp_dir/firmware.tsv"
+    done
+  fi
+  if command_exists nvidia-smi; then
+    nvidia-smi --query-gpu=index,vbios_version --format=csv,noheader 2>/dev/null |
+      awk -F ', ' '{print "gpu:" $1 ":vbios\t" $2}' >>"$tmp_dir/firmware.tsv" || true
+  fi
+  if command_exists fwupdmgr && command_exists jq && command_exists timeout; then
+    timeout 20s fwupdmgr get-devices --json 2>/dev/null |
+      jq -r '.. | objects | select(.Name? and (.Version? or .VersionRaw?)) | ["fwupd:" + .Name, ((.Vendor // "unknown") + " version=" + ((.Version // .VersionRaw) | tostring))] | @tsv' \
+      | awk -F '\t' '{seen[$1]++; print $1 ":" seen[$1] "\t" $2}' \
+      >>"$tmp_dir/firmware.tsv" || true
+  fi
+  LC_ALL=C sort -o "$tmp_dir/firmware.tsv" "$tmp_dir/firmware.tsv"
+}
+
+write_hardware() {
+  : >"$tmp_dir/hardware.tsv"
+  if command_exists lscpu; then
+    lscpu 2>/dev/null | awk -F ':' '
+      $1 ~ /^(Architecture|CPU op-mode\(s\)|Vendor ID|Model name|CPU family|Model|Stepping|Socket\(s\)|Core\(s\) per socket|Thread\(s\) per core)$/ {
+        key=$1; value=$2; sub(/^[[:space:]]+/, "", value); print "cpu:" key "\t" value
+      }
+    ' >>"$tmp_dir/hardware.tsv"
+  fi
+  awk '/^MemTotal:/ {print "memory:total_kib\t" $2}' /proc/meminfo >>"$tmp_dir/hardware.tsv"
+  if command_exists lspci; then
+    lspci -Dnn 2>/dev/null | awk '{key="pci:" $1; $1=""; sub(/^ /, ""); print key "\t" $0}' >>"$tmp_dir/hardware.tsv"
+  fi
+  if command_exists lsusb; then
+    lsusb 2>/dev/null | awk '{id=$6; seen[id]++; key="usb:" id ":" seen[id]; $1=$2=$3=$4=$5=$6=""; sub(/^[[:space:]]+/, ""); print key "\t" $0}' >>"$tmp_dir/hardware.tsv"
+  fi
+  LC_ALL=C sort -o "$tmp_dir/hardware.tsv" "$tmp_dir/hardware.tsv"
+}
+
+write_metadata
+write_packages
+write_services
+write_kernel
+write_gpu
+write_storage
+write_etc_hashes
+write_flatpaks
+write_docker
+write_firmware
+write_hardware
+
+(
+  cd "$tmp_dir"
+  sha256sum -- *.tsv | LC_ALL=C sort -k2 >manifest.sha256
+)
+mv "$tmp_dir" "$FINAL_DIR"
+trap - EXIT
+ln -sfn "$TIMESTAMP" "$HOST_ROOT/latest"
+
+if [[ -n "${WORKSTATION_STATE_SYNC_TARGET:-}" ]]; then
+  rsync -a "$HOST_ROOT/" "$WORKSTATION_STATE_SYNC_TARGET"
+fi
+
+printf '%s\n' "$FINAL_DIR"

@@ -1,0 +1,12 @@
+[Unit]
+Description=Record and synchronize the PC state daily
+
+[Timer]
+OnBootSec=10m
+OnCalendar=*-*-* 08:30
+RandomizedDelaySec=10m
+Persistent=true
+Unit=workstation-state-recorder.service
+
+[Install]
+WantedBy=timers.target

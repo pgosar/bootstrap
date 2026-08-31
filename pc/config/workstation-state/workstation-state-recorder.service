@@ -1,0 +1,16 @@
+[Unit]
+Description=Record and synchronize the PC software and hardware state
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=__STATE_USER__
+Environment=WORKSTATION_STATE_ROOT=/var/lib/workstation-state
+Environment=WORKSTATION_STATE_SYNC_TARGET=nas:/data/personal/system-state/pc/
+ExecStart=/usr/local/bin/workstation-state-recorder pc /var/lib/workstation-state
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

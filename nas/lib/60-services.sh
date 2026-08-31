@@ -46,6 +46,17 @@ configure_operations_basics() {
   run chmod 0755 "$(target_path /usr/local/sbin/nas-weekly-digest)"
   copy_with_backup "$NAS_ROOT/config/systemd/nas-weekly-digest.service" "$(target_path /etc/systemd/system/nas-weekly-digest.service)"
   copy_with_backup "$NAS_ROOT/config/systemd/nas-weekly-digest.timer" "$(target_path /etc/systemd/system/nas-weekly-digest.timer)"
+  copy_with_backup "$NAS_ROOT/../common/workstation-state/workstation-state-recorder" "$(target_path /usr/local/bin/workstation-state-recorder)"
+  run chmod 0755 "$(target_path /usr/local/bin/workstation-state-recorder)"
+  copy_with_backup "$NAS_ROOT/../common/workstation-state/state-diff" "$(target_path /usr/local/bin/state-diff)"
+  run chmod 0755 "$(target_path /usr/local/bin/state-diff)"
+  copy_with_backup "$NAS_ROOT/config/systemd/workstation-state-recorder.service" "$(target_path /etc/systemd/system/workstation-state-recorder.service)"
+  run sed -i -e "s/__STATE_USER__/$NAS_USER/g" -e "s/__STATE_GROUP__/$NAS_GROUP/g" "$(target_path /etc/systemd/system/workstation-state-recorder.service)"
+  copy_with_backup "$NAS_ROOT/config/systemd/workstation-state-recorder.timer" "$(target_path /etc/systemd/system/workstation-state-recorder.timer)"
+  ensure_dir "$(target_path /data/personal/system-state/nas)"
+  ensure_dir "$(target_path /data/personal/system-state/pc)"
+  run chown -R "$PUID:$PGID" "$(target_path /data/personal/system-state)"
+  run chmod 0750 "$(target_path /data/personal/system-state)" "$(target_path /data/personal/system-state/nas)" "$(target_path /data/personal/system-state/pc)"
   copy_with_backup "$NAS_ROOT/config/nas-recent-files" "$(target_path /usr/local/sbin/nas-recent-files)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-recent-files)"
   copy_with_backup "$NAS_ROOT/config/nas-duplicate-report" "$(target_path /usr/local/sbin/nas-duplicate-report)"
@@ -406,6 +417,7 @@ enable_services() {
   target_run systemctl enable systemd-timesyncd.service
   target_run systemctl enable nas-kernel-maintenance-reminder.timer
   target_run systemctl enable nas-weekly-digest.timer
+  target_run systemctl enable workstation-state-recorder.timer
   target_run systemctl enable nas-recent-files.timer
   target_run systemctl enable nas-duplicate-report.timer
   target_run systemctl enable nas-uptime-ledger.timer

@@ -15,6 +15,7 @@ readonly SNAPRAID_EXCLUDED_RELATIVE="${NAS_WEEKLY_DIGEST_SNAPRAID_EXCLUDED_RELAT
 readonly NO_NOTIFY="${NAS_WEEKLY_DIGEST_NO_NOTIFY:-false}"
 readonly RECENT_SUMMARY=/var/lib/nas-recent-files/latest-summary
 readonly DUPLICATE_SUMMARY=/var/lib/nas-duplicate-report/latest-summary
+readonly STATE_DIFF_BIN="${NAS_WEEKLY_DIGEST_STATE_DIFF_BIN:-/usr/local/bin/state-diff}"
 
 mkdir -p "$STATE_DIR" "$REPORT_DIR" "$(dirname "$LOCK_FILE")"
 exec 9>"$LOCK_FILE"
@@ -291,6 +292,23 @@ duplicate_generated="$(summary_value "$DUPLICATE_SUMMARY" generated_at)"
 duplicate_files="${duplicate_files:-0}"
 duplicate_reclaimable="${duplicate_reclaimable:-pending}"
 
+state_summary() {
+  local host="$1"
+  if [ ! -x "$STATE_DIFF_BIN" ]; then
+    printf '%s: state-diff is not installed\n' "$host"
+    return 0
+  fi
+  WORKSTATION_STATE_ROOT=/data/personal/system-state \
+    "$STATE_DIFF_BIN" "$host" '7 days ago' today --brief 2>/dev/null ||
+    printf '%s: no synchronized snapshots available\n' "$host"
+}
+
+nas_state_summary="$(state_summary nas)"
+pc_state_summary="$(state_summary pc)"
+nas_state_changes="$(printf '%s\n' "$nas_state_summary" | sed -n 's/^[^:]*: \([0-9][0-9]*\) changes.*/\1/p')"
+pc_state_changes="$(printf '%s\n' "$pc_state_summary" | sed -n 's/^[^:]*: \([0-9][0-9]*\) changes.*/\1/p')"
+host_state_change_count=$((${nas_state_changes:-0} + ${pc_state_changes:-0}))
+
 report="$REPORT_DIR/$(date +%Y-%m-%d).txt"
 {
   printf 'NAS weekly digest — %s\n\n' "$(date --iso-8601=seconds)"
@@ -319,6 +337,9 @@ report="$REPORT_DIR/$(date +%Y-%m-%d).txt"
   printf 'Duplicate analysis: status=%s | duplicate files=%s | reclaimable=%s\n' "${duplicate_status:-pending first monthly run}" "$duplicate_files" "$duplicate_reclaimable"
   printf 'Duplicate report path: %s\n' "${duplicate_report:-pending first monthly run}"
   [ -n "$duplicate_generated" ] && printf 'Duplicate analysis generated: %s\n' "$duplicate_generated"
+  printf '\nHost state drift (last seven days):\n'
+  printf '%s\n' "$nas_state_summary"
+  printf '%s\n' "$pc_state_summary"
   printf '\nProtection:\n'
   printf 'Configured intake roots currently containing files: %s\n' "$pending_count"
   printf 'Configured path(s) missing: %s\n' "${missing_roots:-none}"
@@ -369,7 +390,7 @@ critical_alerts="$tmp_dir/critical.alerts"
 [ "$btrfs_scrub_error_count" -gt 0 ] && printf 'BTRFS: scrub status needs attention on %s disk(s)\n' "$btrfs_scrub_error_count" >>"$critical_alerts"
 critical_count="$(wc -l <"$critical_alerts")"
 
-review_count=$((docker_bad_count + docker_log_error_count + excluded_count))
+review_count=$((docker_bad_count + docker_log_error_count + excluded_count + host_state_change_count))
 if [ "$critical_count" -gt 0 ]; then
   status="🚨 **Needs attention — $critical_count critical check(s)**"
 elif [ "$review_count" -gt 0 ]; then
@@ -391,6 +412,10 @@ $status
 • Docker: $docker_bad_count not healthy/running · $docker_log_error_count log signal(s)
 • Storage: $disk_low_free_count low-space alert(s) · ${disk_imbalance_gib} GiB disk imbalance
 • Protection: $backup_failure_count backup/parity failure(s) · $btrfs_scrub_error_count scrub issue(s)
+
+**Host drift**
+• $nas_state_summary
+• $pc_state_summary
 
 📄 Full report: $report
 EOF

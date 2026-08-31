@@ -1,0 +1,11 @@
+[Unit]
+Description=Record the NAS state daily
+
+[Timer]
+OnCalendar=*-*-* 06:45
+RandomizedDelaySec=10m
+Persistent=true
+Unit=workstation-state-recorder.service
+
+[Install]
+WantedBy=timers.target

@@ -9,6 +9,7 @@ The repository is split by environment:
 ```text
 nas/   NAS bootstrap and disposable storage validation
 pc/    Workstation/bootstrap installer and QEMU validation
+common/ Shared, secret-safe host inventory and diff tools
 ```
 
 Each environment follows the same basic structure, with NAS retaining its
@@ -115,6 +116,26 @@ The PC script mirrors the current host layout:
 
 The PC bootstrap does not set up dotfiles-only shell plugins. Those stay in the
 dotfiles repo’s own install flow.
+
+## Workstation state history
+
+Both host profiles install a daily `workstation-state-recorder.timer`. The NAS
+stores its snapshots directly under `/data/personal/system-state/nas`; the PC
+spools snapshots locally and synchronizes them to
+`/data/personal/system-state/pc` over its existing SSH route to the NAS.
+
+On the NAS, compare any two dates with:
+
+```bash
+state-diff pc 2026-04-01 today
+state-diff nas '7 days ago' today --brief
+```
+
+The recorder inventories packages, enabled services, kernel and GPU state,
+disks and persistent mounts, selected `/etc` file hashes, Flatpaks, Docker
+containers, firmware versions, and hardware. It deliberately excludes file
+contents, Docker environment variables, disk serials, UUIDs, SSH material, and
+other credential-bearing values.
 
 ## QEMU validation
 
