@@ -50,6 +50,8 @@ configure_operations_basics() {
   run chmod 0755 "$(target_path /usr/local/bin/workstation-state-recorder)"
   copy_with_backup "$NAS_ROOT/../common/workstation-state/state-diff" "$(target_path /usr/local/bin/state-diff)"
   run chmod 0755 "$(target_path /usr/local/bin/state-diff)"
+  copy_with_backup "$NAS_ROOT/../common/workstation-state/workstation-state-prune" "$(target_path /usr/local/bin/workstation-state-prune)"
+  run chmod 0755 "$(target_path /usr/local/bin/workstation-state-prune)"
   copy_with_backup "$NAS_ROOT/config/systemd/workstation-state-recorder.service" "$(target_path /etc/systemd/system/workstation-state-recorder.service)"
   run sed -i -e "s/__STATE_USER__/$NAS_USER/g" -e "s/__STATE_GROUP__/$NAS_GROUP/g" "$(target_path /etc/systemd/system/workstation-state-recorder.service)"
   copy_with_backup "$NAS_ROOT/config/systemd/workstation-state-recorder.timer" "$(target_path /etc/systemd/system/workstation-state-recorder.timer)"

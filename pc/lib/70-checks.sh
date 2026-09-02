@@ -361,9 +361,11 @@ check_expected_services_enabled() {
   check_unit_enabled snapper-cleanup.timer
   check_unit_enabled snapper-timeline.timer false
   check_file_exists "$(target_path /usr/local/bin/workstation-state-recorder)"
+  check_file_exists "$(target_path /usr/local/bin/workstation-state-prune)"
   check_file_exists "$(target_path /etc/systemd/system/workstation-state-recorder.service)"
   check_file_exists "$(target_path /etc/systemd/system/workstation-state-recorder.timer)"
   check_file_contains "$(target_path /etc/systemd/system/workstation-state-recorder.service)" "User=$PC_USER" "state recorder runs as the PC operator"
+  check_file_contains "$(target_path /etc/systemd/system/workstation-state-recorder.service)" "workstation-state-prune /var/lib/workstation-state 30" "state history keeps thirty days"
   check_unit_enabled workstation-state-recorder.timer
   [[ "$ENABLE_SMARTD" == "true" ]] && check_unit_enabled smartd
   [[ "$ENABLE_NFTABLES" == "true" ]] && check_unit_enabled nftables

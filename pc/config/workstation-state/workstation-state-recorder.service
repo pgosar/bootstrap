@@ -9,6 +9,7 @@ User=__STATE_USER__
 Environment=WORKSTATION_STATE_ROOT=/var/lib/workstation-state
 Environment=WORKSTATION_STATE_SYNC_TARGET=nas:/data/personal/system-state/pc/
 ExecStart=/usr/local/bin/workstation-state-recorder pc /var/lib/workstation-state
+ExecStartPost=/usr/local/bin/workstation-state-prune /var/lib/workstation-state 30
 Nice=10
 IOSchedulingClass=idle
 

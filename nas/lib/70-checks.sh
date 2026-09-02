@@ -1064,10 +1064,12 @@ check_common_services() {
   check_unit_enabled nas-weekly-digest.timer true
   check_path_exists "$(target_path /usr/local/bin/workstation-state-recorder)"
   check_path_exists "$(target_path /usr/local/bin/state-diff)"
+  check_path_exists "$(target_path /usr/local/bin/workstation-state-prune)"
   check_path_exists "$(target_path /etc/systemd/system/workstation-state-recorder.service)"
   check_path_exists "$(target_path /etc/systemd/system/workstation-state-recorder.timer)"
   check_file_contains_literal "$(target_path /etc/systemd/system/workstation-state-recorder.service)" "User=$NAS_USER" "state recorder runs as the NAS operator"
   check_file_contains_literal "$(target_path /usr/local/bin/workstation-state-recorder)" "write_etc_hashes" "state recorder hashes selected /etc files"
+  check_file_contains_literal "$(target_path /etc/systemd/system/workstation-state-recorder.service)" "workstation-state-prune /data/personal/system-state 30" "state history keeps thirty days"
   check_unit_enabled workstation-state-recorder.timer true
   check_path_exists "$(target_path /usr/local/sbin/nas-container-health-alert)"
   check_path_exists "$(target_path /etc/systemd/system/nas-container-health-alert.timer)"

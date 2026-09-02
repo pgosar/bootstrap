@@ -9,6 +9,7 @@ User=__STATE_USER__
 Group=__STATE_GROUP__
 Environment=WORKSTATION_STATE_ROOT=/data/personal/system-state
 ExecStart=/usr/local/bin/workstation-state-recorder nas /data/personal/system-state
+ExecStartPost=/usr/local/bin/workstation-state-prune /data/personal/system-state 30
 Nice=10
 IOSchedulingClass=idle
 

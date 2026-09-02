@@ -123,6 +123,8 @@ Both host profiles install a daily `workstation-state-recorder.timer`. The NAS
 stores its snapshots directly under `/data/personal/system-state/nas`; the PC
 spools snapshots locally and synchronizes them to
 `/data/personal/system-state/pc` over its existing SSH route to the NAS.
+Timestamped snapshots are retained for 30 days. The NAS prunes both canonical
+host histories, while the PC independently prunes its local spool.
 
 On the NAS, compare any two dates with:
 
