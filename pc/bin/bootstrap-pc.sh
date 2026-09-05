@@ -4,6 +4,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PC_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
+if [[ "${1:-}" == --test-post-install ]]; then
+  shift
+  exec python3 "$PC_ROOT/../common/qemu/test-post-install.py" "$@"
+fi
+
 for lib in \
   00-defaults.sh \
   10-utils.sh \
