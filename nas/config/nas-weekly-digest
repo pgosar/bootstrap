@@ -8,7 +8,7 @@ readonly LARGE_BYTES="${NAS_WEEKLY_DIGEST_LARGE_BYTES:-1073741824}"
 readonly MAX_ITEMS="${NAS_WEEKLY_DIGEST_MAX_ITEMS:-8}"
 readonly MERGERFS_MIN_FREE_BYTES="${NAS_WEEKLY_DIGEST_MIN_FREE_BYTES:-107374182400}"
 readonly DISK_IMBALANCE_BYTES="${NAS_WEEKLY_DIGEST_IMBALANCE_BYTES:-107374182400}"
-readonly PHOTO_ROOTS="${NAS_WEEKLY_DIGEST_PHOTO_ROOTS:-/data/personal/Photos}"
+readonly PHOTO_ROOTS="${NAS_WEEKLY_DIGEST_PHOTO_ROOTS:-/data/personal/Photos/immich/library/library /data/personal/Photos/immich/library/upload}"
 readonly INBOX_ROOTS="${NAS_WEEKLY_DIGEST_INBOX_ROOTS:-/data/staging/inbox}"
 readonly SNAPRAID_POOL_ROOTS="${NAS_WEEKLY_DIGEST_SNAPRAID_POOL_ROOTS:-/mnt/disk1/pool/media /mnt/disk2/pool/media /mnt/disk3/pool/media}"
 readonly SNAPRAID_EXCLUDED_RELATIVE="${NAS_WEEKLY_DIGEST_SNAPRAID_EXCLUDED_RELATIVE:-torrents iso-mirror tdarr-test .transcode staging snapshots .snapshots '#recycle'}"
@@ -42,6 +42,20 @@ make_manifest() {
   : >"$output"
   while IFS= read -r root; do
     find "$root" -xdev -type f -printf '%p\t%T@\t%s\n' 2>/dev/null || true
+  done < <(existing_roots "$roots") | LC_ALL=C sort -t $'\t' -k1,1 >"$output"
+}
+
+make_photo_manifest() {
+  local roots="$1" output="$2" root
+  : >"$output"
+  while IFS= read -r root; do
+    find "$root" -xdev -type f \( \
+      -iname '*.avif' -o -iname '*.bmp' -o -iname '*.cr2' -o -iname '*.cr3' -o \
+      -iname '*.dng' -o -iname '*.gif' -o -iname '*.heic' -o -iname '*.heif' -o \
+      -iname '*.jpeg' -o -iname '*.jpg' -o -iname '*.nef' -o -iname '*.orf' -o \
+      -iname '*.png' -o -iname '*.raf' -o -iname '*.rw2' -o -iname '*.tif' -o \
+      -iname '*.tiff' -o -iname '*.webp' \
+    \) -printf '%p\t%T@\t%s\n' 2>/dev/null || true
   done < <(existing_roots "$roots") | LC_ALL=C sort -t $'\t' -k1,1 >"$output"
 }
 
@@ -167,7 +181,7 @@ disk_health_line() {
 photos_manifest="$tmp_dir/photos.manifest"
 inbox_manifest="$tmp_dir/inbox.manifest"
 appdata_manifest="$tmp_dir/appdata.manifest"
-make_manifest "$PHOTO_ROOTS" "$photos_manifest"
+make_photo_manifest "$PHOTO_ROOTS" "$photos_manifest"
 make_manifest "$INBOX_ROOTS" "$inbox_manifest"
 make_manifest "/data/docker/appdata" "$appdata_manifest"
 
@@ -323,13 +337,13 @@ report="$REPORT_DIR/$(date +%Y-%m-%d).txt"
   printf 'Btrfs scrub status:\n'
   awk -F '\t' '{print "- " $1 ": " $2}' "$btrfs_scrub_status"
   printf '\nChanges:\n'
-  printf 'New photo files: %s\n' "$photos_count"
+  printf 'New image originals: %s\n' "$photos_count"
   sed -n '1,8p' "$photos_items"
   printf 'New intake files: %s (currently pending: %s)\n' "$inbox_count" "$pending_count"
   sed -n '1,8p' "$inbox_items"
   printf 'Changed Docker appdata files: %s\n' "$appdata_count"
   sed -n '1,8p' "$appdata_items"
-  printf 'New large photo files (>= 1 GiB): %s\n' "$large_count"
+  printf 'New large image originals (>= 1 GiB): %s\n' "$large_count"
   awk -F '\t' '{print "- " $3 " " $1}' "$large_items"
   printf 'Recent files report: media +%s | ISOs +%s | Personal +%s | Inbox +%s | Immich images +%s\n' "$recent_media" "$recent_isos" "$recent_personal" "$recent_inbox" "$recent_immich_images"
   printf 'Recent files report path: %s\n' "${recent_report:-pending first run}"
@@ -404,7 +418,7 @@ summary="$(cat <<EOF
 $status
 
 **Activity**
-• Photos: +$photos_count
+• Photo originals: +$photos_count
 • Intake: +$inbox_count ($pending_count currently pending)
 • Recent additions: media +$recent_media · ISOs +$recent_isos · personal +$recent_personal · Immich +$recent_immich_images
 
