@@ -1,0 +1,28 @@
+/home/__NAS_USER__/wake-pc.log {
+    weekly
+    rotate 27
+    maxage 183
+    maxsize 5M
+    missingok
+    notifempty
+    dateext
+    compress
+    delaycompress
+    create 0640 __NAS_USER__ __NAS_USER__
+    su __NAS_USER__ __NAS_USER__
+}
+
+/data/docker/appdata/nightly-orchestrator/pc-worker-ensure.log
+/data/docker/appdata/nightly-orchestrator/tdarr-wake-monitor.log {
+    weekly
+    rotate 27
+    maxage 183
+    maxsize 5M
+    missingok
+    notifempty
+    dateext
+    compress
+    delaycompress
+    create 0640 __NAS_USER__ __NAS_GROUP__
+    su __NAS_USER__ __NAS_GROUP__
+}

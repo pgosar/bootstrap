@@ -750,6 +750,9 @@ check_common_pc_worker_orchestration() {
   check_path_exists "$(target_path /etc/systemd/system/immich-ml-wake-proxy.service)"
   check_path_exists "$(target_path /etc/systemd/system/tdarr-wake-monitor.service)"
   check_path_exists "$(target_path /etc/systemd/system/tdarr-wake-monitor.timer)"
+  check_path_exists "$(target_path /etc/logrotate.d/pc-worker-orchestration)"
+  check_file_contains_literal "$(target_path /etc/logrotate.d/pc-worker-orchestration)" \
+    "maxage 183" "PC worker logs retain at most six months"
   check_file_contains_literal "$(target_path /etc/systemd/system/immich-ml-wake-proxy.service)" "User=$NAS_USER" "Immich ML wake proxy runs as $NAS_USER"
   check_file_contains_literal "$(target_path /etc/systemd/system/tdarr-wake-monitor.service)" "User=$NAS_USER" "Tdarr wake monitor runs as $NAS_USER"
   check_path_exists "$(active_mount_path "$DOCKER_COMPOSE_DIR")/nightly-orchestrator/immich-ml-wake-proxy.py"
@@ -777,6 +780,7 @@ check_common_pc_worker_orchestration() {
     "/dev/shm/pc-worker-job-triggered" "PC shutdown avoids transient SSH-session markers"
   check_unit_enabled immich-ml-wake-proxy.service true
   check_unit_enabled tdarr-wake-monitor.timer true
+  check_unit_enabled logrotate.timer true
   if [[ "$TARGET_MODE" == "host" ]]; then
     check_unit_active immich-ml-wake-proxy.service true
     check_unit_active tdarr-wake-monitor.timer true
@@ -902,6 +906,7 @@ check_common_snapraid_btrbk_samba() {
 check_enabled_runtime_units() {
   local unit
   local -a always_enabled=(
+    logrotate.timer
     nas-kernel-maintenance-reminder.timer
     nas-weekly-digest.timer
     workstation-state-recorder.timer
@@ -1019,6 +1024,10 @@ check_common_services() {
   check_file_contains_literal "$(target_path /etc/default/nas-storage)" "NAS_UPTIME_BASELINE=$NAS_UPTIME_BASELINE" "nas-storage records uptime baseline policy"
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-uptime-ledger)" "storage_setting(\"PARITY_DISK\"" "uptime ledger uses reviewed parity disk config"
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-uptime-ledger)" "storage_setting(\"NAS_UPTIME_BASELINE\"" "uptime ledger uses reviewed baseline policy"
+  check_file_contains_literal "$(target_path /usr/local/sbin/nas-uptime-ledger)" \
+    "nas-docker-state-backup.service" "uptime ledger reports Docker-state backup results"
+  check_file_contains_literal "$(target_path /usr/local/sbin/nas-uptime-ledger)" \
+    '"list-units", "--failed"' "uptime ledger reports all failed systemd units"
   check_path_exists "$(target_path /etc/profile.d/nas-kernel-reminder.sh)"
   check_file_contains_literal "$(target_path /etc/profile.d/nas-kernel-reminder.sh)" "IgnorePkg includes linux/linux-headers" "kernel reminder documents pacman pin"
   check_path_exists "$(target_path /usr/local/sbin/nas-kernel-maintenance-reminder)"

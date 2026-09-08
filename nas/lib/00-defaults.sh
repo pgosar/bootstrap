@@ -22,6 +22,7 @@ PACMAN_PACKAGES=(
   curl
   wget
   jq
+  logrotate
   smartmontools
   nvme-cli
   hdparm
@@ -161,7 +162,7 @@ PARITY_SPINDOWN_ENABLE="true"
 NAS_UPTIME_BASELINE="auto"
 JOURNALD_SYSTEM_MAX_USE="1G"
 JOURNALD_RUNTIME_MAX_USE="256M"
-JOURNALD_MAX_RETENTION_SEC="1month"
+JOURNALD_MAX_RETENTION_SEC="6month"
 SWAP_ENABLE="true"
 SWAP_MOUNT="/swap"
 SWAP_FILE="/swap/swapfile"

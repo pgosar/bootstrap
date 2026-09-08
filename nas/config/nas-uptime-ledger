@@ -44,6 +44,10 @@ PARITY_STANDBY_TIMEOUT_MINUTES = 30
 PARITY_SPINDOWN_SERVICE = "nas-parity-spindown.service"
 MAINTENANCE_UNITS = {
     "btrbk": ("btrbk.service", "btrbk.timer"),
+    "docker_state_backup": (
+        "nas-docker-state-backup.service",
+        "nas-docker-state-backup.timer",
+    ),
     "snapraid_sync": ("snapraid-sync.service", "snapraid-sync.timer"),
     "snapraid_scrub": ("snapraid-scrub.service", "snapraid-scrub.timer"),
     "container_images": ("nas-container-image-monitor.service", "nas-container-image-monitor.timer"),
@@ -278,6 +282,44 @@ def maintenance_status() -> dict[str, dict]:
     return result
 
 
+def failed_units_status() -> list[dict]:
+    completed = subprocess.run(
+        [
+            "systemctl",
+            "list-units",
+            "--failed",
+            "--no-legend",
+            "--plain",
+            "--no-pager",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return []
+
+    units = []
+    for line in completed.stdout.splitlines():
+        fields = line.split()
+        if not fields or not fields[0].endswith((".service", ".mount", ".socket")):
+            continue
+        unit = fields[0]
+        values = command_properties([
+            "systemctl", "show", unit, "--no-pager",
+            "-p", "Description", "-p", "Result", "-p", "ExecMainStatus",
+            "-p", "StateChangeTimestamp",
+        ])
+        units.append({
+            "unit": unit,
+            "description": values.get("Description", unit),
+            "result": values.get("Result", "unknown"),
+            "exit_status": values.get("ExecMainStatus", ""),
+            "changed_at": values.get("StateChangeTimestamp", ""),
+        })
+    return units
+
+
 def image_update_status() -> dict:
     try:
         value = json.loads(IMAGE_UPDATE_STATUS_FILE.read_text())
@@ -435,8 +477,9 @@ def recent_oom_incidents() -> list[dict]:
     return incidents[-12:]
 
 
-def incidents(maintenance: dict[str, dict]) -> list[dict]:
+def incidents(maintenance: dict[str, dict], failed_units: list[dict]) -> list[dict]:
     values = recent_oom_incidents()
+    represented_services = {item["service"] for item in maintenance.values()}
     for item in maintenance.values():
         if item["state"] == "failed" or item["result"] not in {"success", ""}:
             values.append({
@@ -446,6 +489,16 @@ def incidents(maintenance: dict[str, dict]) -> list[dict]:
                 "service": item["service"],
                 "changed_at": item["changed_at"],
             })
+    for item in failed_units:
+        if item["unit"] in represented_services:
+            continue
+        values.append({
+            "kind": "maintenance_failure",
+            "timestamp": 0,
+            "message": f'{item["description"]} failed (exit {item["exit_status"] or "unknown"})',
+            "service": item["unit"],
+            "changed_at": item["changed_at"],
+        })
     return values
 
 
@@ -476,6 +529,7 @@ def main() -> None:
     data_pool, history = data_pool_history(previous_state, now)
     data_disks, disk_histories = data_disk_samples(previous_state, now)
     maintenance = maintenance_status()
+    failed_units = failed_units_status()
     parity_disk = parity_disk_status()
     backup = backup_status(now)
     connectivity = connectivity_status()
@@ -516,11 +570,12 @@ def main() -> None:
         "data_disks": data_disks,
         "host": host_pressure(),
         "maintenance": maintenance,
+        "failed_units": failed_units,
         "parity_disk": parity_disk,
         "backup": backup,
         "connectivity": connectivity,
         "image_updates": image_updates,
-        "incidents": incidents(maintenance),
+        "incidents": incidents(maintenance, failed_units),
     }
     write_json(STATE_FILE, state)
     write_json(STATUS_FILE, status)

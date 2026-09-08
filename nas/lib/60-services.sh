@@ -326,6 +326,14 @@ configure_pc_worker_orchestration() {
 
   local orchestrator_source="$DOCKER_ROOT/nightly-orchestrator"
   local orchestrator_compat="$DOCKER_COMPOSE_DIR/nightly-orchestrator"
+  ensure_dir "$(target_path /etc/logrotate.d)"
+  copy_with_backup \
+    "$NAS_ROOT/config/logrotate/pc-worker-orchestration" \
+    "$(target_path /etc/logrotate.d/pc-worker-orchestration)"
+  run sed -i \
+    -e "s/__NAS_USER__/$NAS_USER/g" \
+    -e "s/__NAS_GROUP__/$NAS_GROUP/g" \
+    "$(target_path /etc/logrotate.d/pc-worker-orchestration)"
   ensure_dir "$(target_path "$orchestrator_compat")"
   local orchestrator_script source_path compat_path
   for orchestrator_script in \
@@ -426,8 +434,10 @@ enable_services() {
   target_run systemctl enable nas-container-health-alert.timer
   target_run systemctl enable nas-container-image-monitor.timer
   target_run systemctl enable nas-nextcloud-external-scan.timer
+  target_run systemctl enable logrotate.timer
   if [[ "$START_SERVICES" == true && "$TARGET_MODE" == "host" ]]; then
     target_run systemctl start systemd-timesyncd.service
+    target_run systemctl start logrotate.timer
   fi
   if [[ "$SMART_ENABLE" == "true" ]]; then
     target_run systemctl enable smartd.service
