@@ -1,0 +1,9 @@
+[Unit]
+Description=Report systemd unit failure and recovery transitions
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nas-systemd-failure-alert
+TimeoutStartSec=2min

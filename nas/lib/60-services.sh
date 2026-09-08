@@ -67,11 +67,13 @@ configure_operations_basics() {
   run chmod 0755 "$(target_path /usr/local/sbin/nas-uptime-ledger)"
   copy_with_backup "$NAS_ROOT/config/nas-container-health-alert" "$(target_path /usr/local/sbin/nas-container-health-alert)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-container-health-alert)"
+  copy_with_backup "$NAS_ROOT/config/nas-systemd-failure-alert" "$(target_path /usr/local/sbin/nas-systemd-failure-alert)"
+  run chmod 0755 "$(target_path /usr/local/sbin/nas-systemd-failure-alert)"
   copy_with_backup "$NAS_ROOT/config/nas-container-image-monitor" "$(target_path /usr/local/sbin/nas-container-image-monitor)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-container-image-monitor)"
   copy_with_backup "$NAS_ROOT/config/nas-nextcloud-external-scan" "$(target_path /usr/local/sbin/nas-nextcloud-external-scan)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-nextcloud-external-scan)"
-  for unit in nas-recent-files.service nas-recent-files.timer nas-duplicate-report.service nas-duplicate-report.timer nas-uptime-ledger.service nas-uptime-ledger.timer nas-container-health-alert.service nas-container-health-alert.timer nas-container-image-monitor.service nas-container-image-monitor.timer nas-nextcloud-external-scan.service nas-nextcloud-external-scan.timer; do
+  for unit in nas-recent-files.service nas-recent-files.timer nas-duplicate-report.service nas-duplicate-report.timer nas-uptime-ledger.service nas-uptime-ledger.timer nas-container-health-alert.service nas-container-health-alert.timer nas-systemd-failure-alert.service nas-systemd-failure-alert.timer nas-container-image-monitor.service nas-container-image-monitor.timer nas-nextcloud-external-scan.service nas-nextcloud-external-scan.timer; do
     copy_with_backup "$NAS_ROOT/config/systemd/$unit" "$(target_path "/etc/systemd/system/$unit")"
   done
   copy_with_backup "$NAS_ROOT/config/nas-secrets" "$(target_path /usr/local/bin/nas-secrets)"
@@ -432,6 +434,7 @@ enable_services() {
   target_run systemctl enable nas-duplicate-report.timer
   target_run systemctl enable nas-uptime-ledger.timer
   target_run systemctl enable nas-container-health-alert.timer
+  target_run systemctl enable nas-systemd-failure-alert.timer
   target_run systemctl enable nas-container-image-monitor.timer
   target_run systemctl enable nas-nextcloud-external-scan.timer
   target_run systemctl enable logrotate.timer

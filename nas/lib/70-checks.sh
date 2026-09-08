@@ -914,6 +914,7 @@ check_enabled_runtime_units() {
     nas-duplicate-report.timer
     nas-uptime-ledger.timer
     nas-container-health-alert.timer
+    nas-systemd-failure-alert.timer
     nas-container-image-monitor.timer
     nas-nextcloud-external-scan.timer
     nas-btrfs-scrub-disk1.timer
@@ -1084,6 +1085,12 @@ check_common_services() {
   check_path_exists "$(target_path /etc/systemd/system/nas-container-health-alert.timer)"
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-container-health-alert)" "docker-health" "container health transitions use NAS notifications"
   check_unit_enabled nas-container-health-alert.timer true
+  check_path_exists "$(target_path /usr/local/sbin/nas-systemd-failure-alert)"
+  check_path_exists "$(target_path /etc/systemd/system/nas-systemd-failure-alert.service)"
+  check_path_exists "$(target_path /etc/systemd/system/nas-systemd-failure-alert.timer)"
+  check_file_contains_literal "$(target_path /usr/local/sbin/nas-systemd-failure-alert)" \
+    "All monitored systemd units recovered." "systemd failure monitor reports recovery transitions"
+  check_unit_enabled nas-systemd-failure-alert.timer true
   check_path_exists "$(target_path /usr/local/sbin/nas-container-image-monitor)"
   check_path_exists "$(target_path /etc/systemd/system/nas-container-image-monitor.timer)"
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-container-image-monitor)" "docker pull --quiet" "container image monitor checks pinned release channels"
