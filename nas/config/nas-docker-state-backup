@@ -3,6 +3,8 @@
 set -euo pipefail
 
 LOCK_FILE=/run/lock/snapraid-operation.lock
+BTRBK_LOCK_FILE=/run/lock/nas-btrbk-operation.lock
+BTRBK_LOCK_WAIT_SECONDS=1800
 STORAGE_CONFIG=/etc/default/nas-storage
 
 [[ -r "$STORAGE_CONFIG" ]] || {
@@ -14,6 +16,16 @@ STORAGE_CONFIG=/etc/default/nas-storage
 source "$STORAGE_CONFIG"
 backup_owner="${NAS_USER:?NAS_USER is unset in $STORAGE_CONFIG}"
 backup_group="${NAS_GROUP:?NAS_GROUP is unset in $STORAGE_CONFIG}"
+
+exec 8>"$BTRBK_LOCK_FILE"
+if ! flock -n 8; then
+  echo "Waiting up to ${BTRBK_LOCK_WAIT_SECONDS}s for another btrbk operation to finish."
+  if ! flock -w "$BTRBK_LOCK_WAIT_SECONDS" 8; then
+    echo "Docker-state backup failed: timed out waiting for $BTRBK_LOCK_FILE." >&2
+    exit 1
+  fi
+  echo "Acquired the btrbk operation lock after waiting."
+fi
 
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then

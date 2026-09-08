@@ -6,5 +6,4 @@ After=local-fs.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/btrbk -c /etc/btrbk/btrbk.conf run
-
+ExecStart=/usr/bin/flock --verbose --wait 1800 /run/lock/nas-btrbk-operation.lock /usr/bin/btrbk -c /etc/btrbk/btrbk.conf run
