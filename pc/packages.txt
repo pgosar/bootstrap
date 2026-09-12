@@ -95,6 +95,7 @@ kde-gtk-config
 kdialog
 kinfocenter
 kscreen
+kdeconnect
 kwallet-pam
 plasma-desktop
 plasma-nm
