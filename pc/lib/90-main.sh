@@ -45,6 +45,7 @@ main() {
   configure_users
   install_aur_packages
   configure_snapper_root
+  configure_ufw_rules
   if [[ "$INSTALL_ARCH" == true ]]; then
     finalize_installed_system "$TARGET_ROOT"
   fi

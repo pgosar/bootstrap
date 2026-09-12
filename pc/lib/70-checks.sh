@@ -372,6 +372,23 @@ check_expected_services_enabled() {
   return 0
 }
 
+check_ufw_rules() {
+  [[ "$ENABLE_UFW" == "true" ]] || return 0
+
+  local added_rules
+  added_rules="$(check_run_target_capture ufw show added 2>/dev/null || true)"
+  if grep -Fq "ufw allow from $KDECONNECT_LAN_CIDR to any port 1714:1764 proto tcp" <<<"$added_rules"; then
+    check_pass "UFW allows KDE Connect TCP from $KDECONNECT_LAN_CIDR"
+  else
+    check_fail "UFW allows KDE Connect TCP from $KDECONNECT_LAN_CIDR"
+  fi
+  if grep -Fq "ufw allow from $KDECONNECT_LAN_CIDR to any port 1714:1764 proto udp" <<<"$added_rules"; then
+    check_pass "UFW allows KDE Connect UDP from $KDECONNECT_LAN_CIDR"
+  else
+    check_fail "UFW allows KDE Connect UDP from $KDECONNECT_LAN_CIDR"
+  fi
+}
+
 check_health_active_services() {
   [[ "$ENABLE_NETWORKMANAGER" == "true" ]] && check_unit_active_host NetworkManager
   [[ "$ENABLE_SYSTEMD_RESOLVED" == "true" ]] && check_unit_active_host systemd-resolved
@@ -402,6 +419,7 @@ check_live_target() {
   check_package_installed yay
   check_packages_from_file "$AUR_PACKAGE_FILE"
   check_expected_services_enabled
+  check_ufw_rules
   check_target_success "snapper root config usable" snapper --no-dbus -c root list
   check_target_success "user $PC_USER exists in target" id "$PC_USER"
   check_target_success "group wheel exists in target" getent group wheel
@@ -444,6 +462,7 @@ check_health() {
   check_package_installed yay
   check_packages_from_file "$AUR_PACKAGE_FILE"
   check_expected_services_enabled
+  check_ufw_rules
   check_health_active_services
 
   if hostnamectl --static | grep -qx "$PC_HOSTNAME"; then

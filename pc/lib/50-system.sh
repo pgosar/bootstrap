@@ -100,3 +100,12 @@ EOF
     log "+ write snapper root config"
   fi
 }
+
+configure_ufw_rules() {
+  [[ "$SYSTEM" == true || "$SERVICES" == true || "$ENABLE_SERVICES" == true ]] || return 0
+  [[ "$ENABLE_UFW" == "true" ]] || return 0
+  require_root
+
+  target_run ufw allow from "$KDECONNECT_LAN_CIDR" to any port 1714:1764 proto tcp comment "KDE Connect LAN"
+  target_run ufw allow from "$KDECONNECT_LAN_CIDR" to any port 1714:1764 proto udp comment "KDE Connect LAN"
+}
