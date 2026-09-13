@@ -1,0 +1,9 @@
+[Unit]
+Description=Monitor PC and MacBook disk SMART health
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nas-workstation-smart-monitor
+TimeoutStartSec=2min

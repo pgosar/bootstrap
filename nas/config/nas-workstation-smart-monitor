@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# Poll workstation disk health without waking hosts; alert only on transitions.
+set -euo pipefail
+
+readonly STATE_DIR="${NAS_WORKSTATION_SMART_STATE_DIR:-/var/lib/nas-workstation-smart-monitor}"
+readonly STATE_FILE="$STATE_DIR/state"
+readonly STATUS_FILE="$STATE_DIR/status.tsv"
+readonly NO_NOTIFY="${NAS_WORKSTATION_SMART_NO_NOTIFY:-false}"
+readonly SSH_TIMEOUT="${NAS_WORKSTATION_SMART_SSH_TIMEOUT:-5}"
+
+if [[ -r /etc/default/nas-storage ]]; then
+  # shellcheck disable=SC1091
+  source /etc/default/nas-storage
+fi
+
+readonly SSH_LOCAL_USER="${NAS_WORKSTATION_SMART_SSH_LOCAL_USER:-${NAS_USER:-chilly}}"
+readonly PC_TARGET="${NAS_WORKSTATION_SMART_PC_TARGET:-100.91.239.107}"
+readonly PC_HOST_KEY_ALIAS="${NAS_WORKSTATION_SMART_PC_HOST_KEY_ALIAS:-100.91.239.107}"
+readonly MACBOOK_TARGET="${NAS_WORKSTATION_SMART_MACBOOK_TARGET:-100.89.119.15}"
+readonly MACBOOK_HOST_KEY_ALIAS="${NAS_WORKSTATION_SMART_MACBOOK_HOST_KEY_ALIAS:-192.168.1.126}"
+
+readonly PC_CHECK='set -u
+scan="$(sudo -n smartctl --scan-open 2>/dev/null)" || exit 2
+devices="$(printf "%s\n" "$scan" | sed -n "s|^\\(/dev/[^[:space:]]*\\).*|\\1|p")"
+[ -n "$devices" ] || exit 2
+bad=0
+while IFS= read -r device; do
+  [ -n "$device" ] || continue
+  output="$(sudo -n smartctl -H -A "$device" 2>/dev/null)" || exit 2
+  health="$(printf "%s\n" "$output" | sed -n -E "s/^SMART (overall-health self-assessment test result|Health Status):[[:space:]]*//p" | head -n1)"
+  critical="$(printf "%s\n" "$output" | sed -n "s/^Critical Warning:[[:space:]]*//p" | tr -d "[:space:]" | head -n1)"
+  temperature="$(printf "%s\n" "$output" | sed -n "s/^Temperature:[[:space:]]*//p" | tr -cd "0-9\\n" | head -n1)"
+  used="$(printf "%s\n" "$output" | sed -n "s/^Percentage Used:[[:space:]]*//p" | tr -cd "0-9\\n" | head -n1)"
+  media_errors="$(printf "%s\n" "$output" | sed -n "s/^Media and Data Integrity Errors:[[:space:]]*//p" | tr -cd "0-9\\n" | head -n1)"
+  printf "%s health=%s critical=%s temperature=%sC used=%s%% media_errors=%s\n" \
+    "$device" "${health:-unknown}" "${critical:-unknown}" "${temperature:-unknown}" "${used:-unknown}" "${media_errors:-unknown}"
+  [ "$health" = PASSED ] || bad=1
+  case "$critical" in ""|0|0x00) ;; *) bad=1 ;; esac
+  [ -z "$temperature" ] || [ "$temperature" -lt 70 ] || bad=1
+  [ -z "$used" ] || [ "$used" -lt 90 ] || bad=1
+  [ -z "$media_errors" ] || [ "$media_errors" -eq 0 ] || bad=1
+done <<EOF
+$devices
+EOF
+exit "$bad"'
+
+readonly MACBOOK_CHECK='set -u
+output="$(diskutil info disk0 2>/dev/null)" || exit 2
+health="$(printf "%s\n" "$output" | sed -n "s/^[[:space:]]*SMART Status:[[:space:]]*//p" | head -n1)"
+printf "disk0 health=%s\n" "${health:-unknown}"
+[ "$health" = Verified ]'
+
+install -d -m 0755 "$STATE_DIR"
+tmp_state="$(mktemp --tmpdir="$STATE_DIR" .state.XXXXXX)"
+tmp_status="$(mktemp --tmpdir="$STATE_DIR" .status.XXXXXX)"
+cleanup() {
+  rm -f -- "$tmp_state" "$tmp_status"
+}
+trap cleanup EXIT
+
+previous=""
+[[ ! -f "$STATE_FILE" ]] || previous="$(cat "$STATE_FILE")"
+
+ssh_remote() {
+  local target="$1"
+  local host_key_alias="$2"
+  local command="$3"
+  local -a ssh_args=(
+    -o BatchMode=yes
+    -o ConnectTimeout="$SSH_TIMEOUT"
+    -o "HostKeyAlias=$host_key_alias"
+    -l "$SSH_LOCAL_USER"
+    "$target"
+    "$command"
+  )
+  if [[ "$(id -un)" == "$SSH_LOCAL_USER" ]]; then
+    ssh "${ssh_args[@]}"
+  else
+    runuser -u "$SSH_LOCAL_USER" -- ssh "${ssh_args[@]}"
+  fi
+}
+
+carry_previous_issue() {
+  local host="$1"
+  [[ -n "$previous" ]] || return 0
+  printf '%s\n' "$previous" | awk -F '\t' -v host="$host" '$1 == host'
+}
+
+check_host() {
+  local host="$1"
+  local target="$2"
+  local host_key_alias="$3"
+  local check_command="$4"
+  local output rc detail
+
+  if ! ssh_remote "$target" "$host_key_alias" true >/dev/null 2>&1; then
+    printf '%s\toffline\thealth unknown; host was not woken\n' "$host" >>"$tmp_status"
+    carry_previous_issue "$host" >>"$tmp_state"
+    return 0
+  fi
+
+  rc=0
+  output="$(ssh_remote "$target" "$host_key_alias" "$check_command" 2>&1)" || rc=$?
+  detail="$(printf '%s' "$output" | tr '\n\t' '; ' | sed -E 's/[[:space:]]+/ /g; s/[; ]+$//')"
+  if [[ "$rc" -eq 0 ]]; then
+    printf '%s\tonline\tok\t%s\n' "$host" "$detail" >>"$tmp_status"
+  elif [[ "$rc" -eq 1 ]]; then
+    printf '%s\tonline\tunhealthy\t%s\n' "$host" "$detail" >>"$tmp_status"
+    printf '%s\t%s\n' "$host" "$detail" >>"$tmp_state"
+  else
+    printf '%s\tonline\tcheck-failed\t%s\n' "$host" "$detail" >>"$tmp_status"
+    printf '%s\tSMART check failed: %s\n' "$host" "${detail:-remote command exited $rc}" >>"$tmp_state"
+  fi
+}
+
+check_host pc "$PC_TARGET" "$PC_HOST_KEY_ALIAS" "$PC_CHECK"
+check_host macbook "$MACBOOK_TARGET" "$MACBOOK_HOST_KEY_ALIAS" "$MACBOOK_CHECK"
+sort -u "$tmp_state" -o "$tmp_state"
+
+current="$(cat "$tmp_state")"
+if [[ "$current" != "$previous" && "$NO_NOTIFY" != true ]]; then
+  if [[ -z "$current" ]]; then
+    /usr/local/sbin/nas-notify workstation-smart 'All monitored PC and MacBook disks recovered and are healthy.'
+  else
+    message=$'Workstation disk health needs attention:\n'
+    while IFS=$'\t' read -r host detail; do
+      [[ -n "$host" ]] || continue
+      message+="- $host: $detail"
+      message+=$'\n'
+    done <"$tmp_state"
+    /usr/local/sbin/nas-notify workstation-smart "$message"
+  fi
+fi
+
+install -m 0644 "$tmp_state" "$STATE_FILE"
+install -m 0644 "$tmp_status" "$STATUS_FILE"
