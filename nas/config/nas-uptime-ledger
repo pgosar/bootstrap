@@ -53,6 +53,7 @@ MAINTENANCE_UNITS = {
     "container_images": ("nas-container-image-monitor.service", "nas-container-image-monitor.timer"),
 }
 IMAGE_UPDATE_STATUS_FILE = Path("/var/lib/nas-container-image-monitor/status.json")
+WORKSTATION_SMART_STATUS_FILE = Path("/var/lib/nas-workstation-smart-monitor/status.tsv")
 BACKUP_COPIES = (("disk1", "disk2"), ("disk2", "disk3"), ("disk3", "disk1"))
 INTERNET_PROBE_URL = "https://1.1.1.1/"
 
@@ -330,6 +331,58 @@ def image_update_status() -> dict:
         return {"checked_at": None, "updates_available": None, "updates": [], "errors": []}
 
 
+def workstation_smart_status() -> dict:
+    """Expose the non-waking workstation SMART monitor's latest results."""
+    hosts = []
+    try:
+        sampled_at = datetime.fromtimestamp(
+            WORKSTATION_SMART_STATUS_FILE.stat().st_mtime, timezone.utc
+        ).isoformat().replace("+00:00", "Z")
+        lines = WORKSTATION_SMART_STATUS_FILE.read_text().splitlines()
+    except OSError:
+        return {"sampled_at": None, "hosts": []}
+
+    integer_fields = {
+        "temperature_c",
+        "used_percent",
+        "media_errors",
+        "error_log_entries",
+        "reallocated",
+        "pending",
+        "offline_uncorrectable",
+    }
+    for line in lines:
+        fields = line.split("\t", 3)
+        if len(fields) < 3:
+            continue
+        host, connectivity, status = fields[:3]
+        detail = fields[3] if len(fields) == 4 else ""
+        devices = []
+        for chunk in detail.split(";"):
+            values = {}
+            for index, token in enumerate(chunk.strip().split()):
+                key, separator, value = token.partition("=")
+                if separator:
+                    values[key] = value
+                elif index == 0 and token.startswith(("/dev/", "disk")):
+                    values["device"] = token
+            if not values.get("device"):
+                continue
+            for key in integer_fields:
+                try:
+                    values[key] = int(values[key])
+                except (KeyError, ValueError):
+                    values[key] = None
+            devices.append(values)
+        hosts.append({
+            "host": host,
+            "connectivity": connectivity,
+            "status": status,
+            "devices": devices,
+        })
+    return {"sampled_at": sampled_at, "hosts": hosts}
+
+
 def backup_status(now: int) -> dict:
     """Report the three cross-disk Docker-state replicas from their manifests."""
     copies = []
@@ -534,6 +587,7 @@ def main() -> None:
     backup = backup_status(now)
     connectivity = connectivity_status()
     image_updates = image_update_status()
+    workstation_smart = workstation_smart_status()
     if "container_images" in maintenance:
         maintenance["container_images"]["update_count"] = image_updates.get("updates_available")
         maintenance["container_images"]["error_count"] = len(image_updates.get("errors", []))
@@ -575,6 +629,7 @@ def main() -> None:
         "backup": backup,
         "connectivity": connectivity,
         "image_updates": image_updates,
+        "workstation_smart": workstation_smart,
         "incidents": incidents(maintenance, failed_units),
     }
     write_json(STATE_FILE, state)

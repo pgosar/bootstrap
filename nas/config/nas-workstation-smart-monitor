@@ -18,6 +18,8 @@ readonly PC_TARGET="${NAS_WORKSTATION_SMART_PC_TARGET:-100.91.239.107}"
 readonly PC_HOST_KEY_ALIAS="${NAS_WORKSTATION_SMART_PC_HOST_KEY_ALIAS:-100.91.239.107}"
 readonly MACBOOK_TARGET="${NAS_WORKSTATION_SMART_MACBOOK_TARGET:-100.89.119.15}"
 readonly MACBOOK_HOST_KEY_ALIAS="${NAS_WORKSTATION_SMART_MACBOOK_HOST_KEY_ALIAS:-192.168.1.126}"
+readonly MACBOOK_FALLBACK_TARGET="${NAS_WORKSTATION_SMART_MACBOOK_FALLBACK_TARGET:-192.168.1.126}"
+readonly MACBOOK_FALLBACK_HOST_KEY_ALIAS="${NAS_WORKSTATION_SMART_MACBOOK_FALLBACK_HOST_KEY_ALIAS:-192.168.1.126}"
 
 readonly PC_CHECK='set -u
 scan="$(sudo -n smartctl --scan-open 2>/dev/null)" || exit 2
@@ -26,29 +28,56 @@ devices="$(printf "%s\n" "$scan" | sed -n "s|^\\(/dev/[^[:space:]]*\\).*|\\1|p")
 bad=0
 while IFS= read -r device; do
   [ -n "$device" ] || continue
-  output="$(sudo -n smartctl -H -A "$device" 2>/dev/null)" || exit 2
+  output="$(sudo -n smartctl -i -H -A "$device" 2>/dev/null)" || exit 2
   health="$(printf "%s\n" "$output" | sed -n -E "s/^SMART (overall-health self-assessment test result|Health Status):[[:space:]]*//p" | head -n1)"
   critical="$(printf "%s\n" "$output" | sed -n "s/^Critical Warning:[[:space:]]*//p" | tr -d "[:space:]" | head -n1)"
   temperature="$(printf "%s\n" "$output" | sed -n "s/^Temperature:[[:space:]]*//p" | tr -cd "0-9\\n" | head -n1)"
+  [ -n "$temperature" ] || temperature="$(printf "%s\n" "$output" | awk "\$2 == \"Temperature_Celsius\" || \$2 == \"Airflow_Temperature_Cel\" { print \$10; exit }")"
   used="$(printf "%s\n" "$output" | sed -n "s/^Percentage Used:[[:space:]]*//p" | tr -cd "0-9\\n" | head -n1)"
   media_errors="$(printf "%s\n" "$output" | sed -n "s/^Media and Data Integrity Errors:[[:space:]]*//p" | tr -cd "0-9\\n" | head -n1)"
-  printf "%s health=%s critical=%s temperature=%sC used=%s%% media_errors=%s\n" \
-    "$device" "${health:-unknown}" "${critical:-unknown}" "${temperature:-unknown}" "${used:-unknown}" "${media_errors:-unknown}"
+  error_entries="$(printf "%s\n" "$output" | sed -n "s/^Error Information Log Entries:[[:space:]]*//p" | tr -cd "0-9\\n" | head -n1)"
+  reallocated="$(printf "%s\n" "$output" | awk "\$2 == \"Reallocated_Sector_Ct\" { print \$10; exit }")"
+  pending="$(printf "%s\n" "$output" | awk "\$2 == \"Current_Pending_Sector\" { print \$10; exit }")"
+  offline_uncorrectable="$(printf "%s\n" "$output" | awk "\$2 == \"Offline_Uncorrectable\" { print \$10; exit }")"
+  role=external
+  case "$device" in /dev/nvme*) role=internal ;; esac
+  printf "device=%s role=%s health=%s critical=%s temperature_c=%s used_percent=%s media_errors=%s error_log_entries=%s reallocated=%s pending=%s offline_uncorrectable=%s\n" \
+    "$device" "$role" "${health:-unknown}" "${critical:-unknown}" "${temperature:-unknown}" "${used:-unknown}" \
+    "${media_errors:-unknown}" "${error_entries:-unknown}" "${reallocated:-unknown}" "${pending:-unknown}" "${offline_uncorrectable:-unknown}"
   [ "$health" = PASSED ] || bad=1
   case "$critical" in ""|0|0x00) ;; *) bad=1 ;; esac
   [ -z "$temperature" ] || [ "$temperature" -lt 70 ] || bad=1
   [ -z "$used" ] || [ "$used" -lt 90 ] || bad=1
   [ -z "$media_errors" ] || [ "$media_errors" -eq 0 ] || bad=1
+  [ -z "$reallocated" ] || [ "$reallocated" -eq 0 ] || bad=1
+  [ -z "$pending" ] || [ "$pending" -eq 0 ] || bad=1
+  [ -z "$offline_uncorrectable" ] || [ "$offline_uncorrectable" -eq 0 ] || bad=1
 done <<EOF
 $devices
 EOF
 exit "$bad"'
 
 readonly MACBOOK_CHECK='set -u
-output="$(diskutil info disk0 2>/dev/null)" || exit 2
-health="$(printf "%s\n" "$output" | sed -n "s/^[[:space:]]*SMART Status:[[:space:]]*//p" | head -n1)"
-printf "disk0 health=%s\n" "${health:-unknown}"
-[ "$health" = Verified ]'
+smartctl_bin=""
+for candidate in /opt/homebrew/bin/smartctl /usr/local/bin/smartctl /usr/local/sbin/smartctl; do
+  [ ! -x "$candidate" ] || { smartctl_bin="$candidate"; break; }
+done
+[ -n "$smartctl_bin" ] || exit 2
+output="$("$smartctl_bin" -i -H -A /dev/disk0 2>/dev/null)" || exit 2
+health="$(printf "%s\n" "$output" | sed -n -E "s/^SMART (overall-health self-assessment test result|Health Status):[[:space:]]*//p" | head -n1)"
+critical="$(printf "%s\n" "$output" | sed -n "s/^Critical Warning:[[:space:]]*//p" | tr -d "[:space:]" | head -n1)"
+temperature="$(printf "%s\n" "$output" | sed -n "s/^Temperature:[[:space:]]*//p" | tr -cd "0-9\\n" | head -n1)"
+used="$(printf "%s\n" "$output" | sed -n "s/^Percentage Used:[[:space:]]*//p" | tr -cd "0-9\\n" | head -n1)"
+media_errors="$(printf "%s\n" "$output" | sed -n "s/^Media and Data Integrity Errors:[[:space:]]*//p" | tr -cd "0-9\\n" | head -n1)"
+error_entries="$(printf "%s\n" "$output" | sed -n "s/^Error Information Log Entries:[[:space:]]*//p" | tr -cd "0-9\\n" | head -n1)"
+printf "device=disk0 role=internal health=%s critical=%s temperature_c=%s used_percent=%s media_errors=%s error_log_entries=%s reallocated=unknown pending=unknown offline_uncorrectable=unknown\n" \
+  "${health:-unknown}" "${critical:-unknown}" "${temperature:-unknown}" "${used:-unknown}" "${media_errors:-unknown}" "${error_entries:-unknown}"
+[ "$health" = PASSED ] || exit 1
+case "$critical" in ""|0|0x00) ;; *) exit 1 ;; esac
+[ -z "$temperature" ] || [ "$temperature" -lt 70 ] || exit 1
+[ -z "$used" ] || [ "$used" -lt 90 ] || exit 1
+[ -z "$media_errors" ] || [ "$media_errors" -eq 0 ] || exit 1
+exit 0'
 
 install -d -m 0755 "$STATE_DIR"
 tmp_state="$(mktemp --tmpdir="$STATE_DIR" .state.XXXXXX)"
@@ -59,7 +88,9 @@ cleanup() {
 trap cleanup EXIT
 
 previous=""
+previous_status=""
 [[ ! -f "$STATE_FILE" ]] || previous="$(cat "$STATE_FILE")"
+[[ ! -f "$STATUS_FILE" ]] || previous_status="$(cat "$STATUS_FILE")"
 
 ssh_remote() {
   local target="$1"
@@ -80,10 +111,27 @@ ssh_remote() {
   fi
 }
 
+ssh_reachable() {
+  local target="$1"
+  local host_key_alias="$2"
+  ssh_remote "$target" "$host_key_alias" true >/dev/null 2>&1
+}
+
 carry_previous_issue() {
   local host="$1"
   [[ -n "$previous" ]] || return 0
   printf '%s\n' "$previous" | awk -F '\t' -v host="$host" '$1 == host'
+}
+
+write_offline_status() {
+  local host="$1"
+  local prior
+  prior="$(printf '%s\n' "$previous_status" | awk -F '\t' -v host="$host" '$1 == host { print; exit }')"
+  if [[ "$prior" == *$'\t'*$'\t'*$'\t'* ]]; then
+    printf '%s\n' "$prior" | awk -F '\t' 'BEGIN { OFS="\t" } { $2="offline"; print }' >>"$tmp_status"
+  else
+    printf '%s\toffline\tunknown\tdevice=unknown health=UNKNOWN\n' "$host" >>"$tmp_status"
+  fi
 }
 
 check_host() {
@@ -93,8 +141,8 @@ check_host() {
   local check_command="$4"
   local output rc detail
 
-  if ! ssh_remote "$target" "$host_key_alias" true >/dev/null 2>&1; then
-    printf '%s\toffline\thealth unknown; host was not woken\n' "$host" >>"$tmp_status"
+  if ! ssh_reachable "$target" "$host_key_alias"; then
+    write_offline_status "$host"
     carry_previous_issue "$host" >>"$tmp_state"
     return 0
   fi
@@ -113,8 +161,16 @@ check_host() {
   fi
 }
 
+check_macbook() {
+  if ssh_reachable "$MACBOOK_TARGET" "$MACBOOK_HOST_KEY_ALIAS"; then
+    check_host macbook "$MACBOOK_TARGET" "$MACBOOK_HOST_KEY_ALIAS" "$MACBOOK_CHECK"
+  else
+    check_host macbook "$MACBOOK_FALLBACK_TARGET" "$MACBOOK_FALLBACK_HOST_KEY_ALIAS" "$MACBOOK_CHECK"
+  fi
+}
+
 check_host pc "$PC_TARGET" "$PC_HOST_KEY_ALIAS" "$PC_CHECK"
-check_host macbook "$MACBOOK_TARGET" "$MACBOOK_HOST_KEY_ALIAS" "$MACBOOK_CHECK"
+check_macbook
 sort -u "$tmp_state" -o "$tmp_state"
 
 current="$(cat "$tmp_state")"
