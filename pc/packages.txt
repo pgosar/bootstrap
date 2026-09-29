@@ -49,8 +49,7 @@ the_silver_searcher
 go
 rust
 cmake
-nodejs
-npm
+fnm
 tree-sitter-cli
 diffutils
 difftastic

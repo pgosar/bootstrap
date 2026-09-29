@@ -44,6 +44,7 @@ main() {
   configure_host_identity
   configure_users
   install_aur_packages
+  setup_fnm
   configure_snapper_root
   configure_ufw_rules
   if [[ "$INSTALL_ARCH" == true ]]; then

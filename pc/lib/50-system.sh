@@ -109,3 +109,17 @@ configure_ufw_rules() {
   target_run ufw allow from "$KDECONNECT_LAN_CIDR" to any port 1714:1764 proto tcp comment "KDE Connect LAN"
   target_run ufw allow from "$KDECONNECT_LAN_CIDR" to any port 1714:1764 proto udp comment "KDE Connect LAN"
 }
+
+setup_fnm() {
+  [[ "$PACKAGES" == true ]] || return 0
+  require_root
+
+  if [[ "$APPLY" != true ]]; then
+    log "+ install LTS Node via fnm for $PC_USER and set as default"
+    return 0
+  fi
+
+  # Install latest LTS Node and set as fnm default so the dotfiles
+  # zshrc (eval "$(fnm env --use-on-cd)") provides node/npm.
+  target_run runuser -u "$PC_USER" -- bash -lc "fnm install --lts && fnm default lts-latest"
+}
