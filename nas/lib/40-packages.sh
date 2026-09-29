@@ -174,3 +174,16 @@ install_aur_packages() {
   done
   return 0
 }
+
+setup_fnm() {
+  [[ "$PACKAGES" == true ]] || return 0
+
+  if [[ "$APPLY" != true ]]; then
+    log "+ install LTS Node via fnm for $NAS_USER and set as default"
+    return 0
+  fi
+
+  # Install latest LTS Node and set as fnm default so the dotfiles
+  # zshrc (eval "$(fnm env --use-on-cd)") provides node/npm.
+  target_run sudo -Hu "$NAS_USER" bash -lc "fnm install --lts && fnm default lts-latest"
+}

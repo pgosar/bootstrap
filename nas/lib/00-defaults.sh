@@ -55,6 +55,7 @@ PACMAN_PACKAGES=(
   gptfdisk
   wol
   fclones
+  fnm
 )
 
 PACMAN_IGNORE_PACKAGES=(
