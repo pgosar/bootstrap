@@ -63,7 +63,7 @@ PACMAN_IGNORE_PACKAGES=(
   linux-headers
 )
 
-AUR_PACKAGES=(yay mergerfs snapraid informant)
+AUR_PACKAGES=(yay mergerfs snapraid informant pacman-static)
 BTRFS_DATA_MOUNT_OPTS="rw,noatime,compress=zstd:3,space_cache=v2"
 BTRFS_DATA_FSTAB_OPTS="$BTRFS_DATA_MOUNT_OPTS,nofail,x-systemd.device-timeout=10s"
 BTRFS_OS_MOUNT_OPTS="rw,noatime,compress=zstd:3,space_cache=v2"
