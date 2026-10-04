@@ -215,7 +215,7 @@ setup_cargo_tools() {
 
   # Shell essentials from dotfiles plus user-requested tools.
   # Skip if already installed (idempotent).
-  local tools=(cargo-cache topgrade tokei starship procs rm-improved vivid zoxide)
+  local tools=(cargo-cache topgrade tokei starship procs rm-improved vivid zoxide bat)
   for tool in "${tools[@]}"; do
     local bin="$tool"
     [[ "$tool" == "rm-improved" ]] && bin="rip"
