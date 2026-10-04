@@ -22,6 +22,7 @@ PACMAN_PACKAGES=(
   fd
   the_silver_searcher
   gdu
+  samba
   openssh
   inetutils
   rsync
