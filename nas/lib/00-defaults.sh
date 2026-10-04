@@ -19,6 +19,8 @@ PACMAN_PACKAGES=(
   zsh
   fzf
   kitty-terminfo
+  fd
+  the_silver_searcher
   openssh
   inetutils
   rsync
