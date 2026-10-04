@@ -158,12 +158,12 @@ build_aur_package_with_makepkg() {
 }
 
 install_aur_packages() {
-  log "Phase: install AUR packages with makepkg"
+  log "Phase: install AUR packages with yay"
   log "AUR package list:"
   printf '  %s\n' "${AUR_PACKAGES[@]}"
   warn "AUR packages execute PKGBUILD build scripts. Review package sources before applying."
   if [[ "$APPLY" != true ]]; then
-    log "Would build AUR packages with makepkg as $NAS_USER: ${AUR_PACKAGES[*]}"
+    log "Would install AUR packages with yay as $NAS_USER: ${AUR_PACKAGES[*]}"
     return 0
   fi
   target_command_available git || die "git is required in target for AUR builds"
@@ -173,13 +173,21 @@ install_aur_packages() {
   uid="$(target_run_capture id -u "$NAS_USER")"
   [[ "$uid" != "0" ]] || die "AUR builds must not run as root"
 
+  # Bootstrap yay first via makepkg, then use yay for the rest
+  build_aur_package_with_makepkg "yay"
+
   local package
   for package in "${AUR_PACKAGES[@]}"; do
-    build_aur_package_with_makepkg "$package"
+    [[ "$package" == "yay" ]] && continue
+    if target_run_capture pacman -Q "$package" >/dev/null 2>&1; then
+      log "AUR package already installed: $package"
+      continue
+    fi
+    log "Installing AUR package with yay: $package"
+    target_run sudo -Hu "$NAS_USER" yay -S --noconfirm --needed "$package"
   done
   return 0
 }
-
 setup_fnm() {
   [[ "$PACKAGES" == true ]] || return 0
 
