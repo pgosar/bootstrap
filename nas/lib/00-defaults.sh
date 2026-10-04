@@ -16,6 +16,9 @@ PACMAN_PACKAGES=(
   vim
   neovim
   tmux
+  zsh
+  fzf
+  kitty-terminfo
   openssh
   inetutils
   rsync
