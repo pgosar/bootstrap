@@ -5,6 +5,7 @@ configure_operations_basics() {
   ensure_dir "$(target_path /etc/NetworkManager/system-connections)"
   ensure_dir "$(target_path /etc/default)"
   ensure_dir "$(target_path /etc/sysctl.d)"
+  ensure_dir "$(target_path /etc/tmpfiles.d)"
   ensure_dir "$(target_path /etc/zsh)"
   ensure_dir "$(target_path /usr/local/sbin)"
   ensure_dir "$(target_path /mnt/docker-state-backup)"
@@ -40,6 +41,7 @@ configure_operations_basics() {
   backup_file "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)"
   write_text "$(target_path /etc/systemd/journald.conf.d/90-nas-bootstrap.conf)" \
     "[Journal]"$'\n'"SystemMaxUse=$JOURNALD_SYSTEM_MAX_USE"$'\n'"RuntimeMaxUse=$JOURNALD_RUNTIME_MAX_USE"$'\n'"MaxRetentionSec=$JOURNALD_MAX_RETENTION_SEC"$'\n'
+  copy_with_backup "$NAS_ROOT/config/tmpfiles.d/nas-uptime.conf" "$(target_path /etc/tmpfiles.d/nas-uptime.conf)"
   copy_with_backup "$NAS_ROOT/config/nas-notify" "$(target_path /usr/local/sbin/nas-notify)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-notify)"
   copy_with_backup "$NAS_ROOT/config/nas-weekly-digest" "$(target_path /usr/local/sbin/nas-weekly-digest)"
