@@ -178,6 +178,11 @@ DISK_LAYOUT_REVIEWED="false"
 VALIDATE_WRITE_TESTS="false"
 FIREWALL_ENABLE="true"
 FIREWALL_LAN_CIDRS="192.168.0.0/16 10.0.0.0/8 172.16.0.0/12 100.64.0.0/10"
+# TCP ports published by Docker containers (0.0.0.0 bindings). Keep in sync
+# with the compose stacks: the firewall drops traffic to ports missing here.
+# Regenerate with:
+#   docker ps --format "{{.Ports}}" | grep -oE "0.0.0.0:[0-9]+" | grep -oE "[0-9]+" | sort -un | tr "\n" " "
+FIREWALL_DOCKER_PORTS="2283 4567 5055 5056 7878 8080 8082 8083 8096 8191 8265 8266 8787 8888 8989 9696 25600"
 SMART_ENABLE="true"
 PARITY_SPINDOWN_ENABLE="true"
 NAS_UPTIME_BASELINE="auto"
