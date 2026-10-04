@@ -130,6 +130,7 @@ main() {
     install_aur_packages
     setup_fnm
     setup_rust
+    setup_cargo_tools
   fi
   [[ "$STORAGE" == true ]] && configure_storage
   [[ "$SERVICES" == true ]] && configure_services

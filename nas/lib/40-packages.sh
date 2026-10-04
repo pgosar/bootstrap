@@ -202,3 +202,21 @@ setup_rust() {
   # Install rustup and stable toolchain for the NAS user.
   target_run sudo -Hu "$NAS_USER" bash -lc "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path"
 }
+
+setup_cargo_tools() {
+  [[ "$PACKAGES" == true ]] || return 0
+
+  if [[ "$APPLY" != true ]]; then
+    log "+ install cargo tools for $NAS_USER"
+    return 0
+  fi
+
+  # Shell essentials from dotfiles plus user-requested tools.
+  # Skip if already installed (idempotent).
+  local tools=(cargo-cache topgrade tokei starship procs rm-improved vivid zoxide)
+  for tool in "${tools[@]}"; do
+    local bin="$tool"
+    [[ "$tool" == "rm-improved" ]] && bin="rip"
+    target_run sudo -Hu "$NAS_USER" bash -lc "command -v $bin >/dev/null || cargo install --locked $tool"
+  done
+}
