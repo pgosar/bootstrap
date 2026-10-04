@@ -379,8 +379,26 @@ verify_active_pool_writable() {
   rm -f "$test_path"
 }
 
+# Create local SSD directories for database state (SQLite/BoltDB).
+# These live on the system SSD, not mergerfs, to avoid FUSE overhead
+# and locking issues with database files.
+configure_ssd_db_dirs() {
+  log "Phase: local SSD database directories"
+  local entry dir owner group mode
+  for entry in "${SSD_DB_DIRS[@]}"; do
+    dir="${entry%%:*}"
+    owner="$(cut -d: -f2 <<<"$entry")"
+    group="$(cut -d: -f3 <<<"$entry")"
+    mode="$(cut -d: -f4 <<<"$entry")"
+    ensure_dir "$(target_path "$dir")"
+    run chown "$owner:$group" "$(target_path "$dir")"
+    run chmod "$mode" "$(target_path "$dir")"
+  done
+}
+
 configure_storage() {
   log "Phase: storage, btrfs layout, and mergerfs"
+  configure_ssd_db_dirs
   if ! target_command_available mergerfs; then
     warn "mergerfs command not found; install it before mounting /data."
   fi
