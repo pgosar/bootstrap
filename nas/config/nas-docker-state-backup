@@ -74,3 +74,46 @@ backup_disk() {
 backup_disk 1 2
 backup_disk 2 3
 backup_disk 3 1
+
+# NVMe-hosted application databases live outside the btrfs data-disk snapshots.
+# Back them up with rsync, preserving numeric ownership (do NOT chown — database
+# processes require specific UIDs, e.g. postgres 999). Replicated to all three
+# data disks for cross-disk redundancy.
+NVME_DB_DIRS=(
+  /var/lib/immich-postgres
+  /var/lib/tdarr-server
+  /var/lib/scrutiny-influxdb
+  /var/lib/sonarr
+  /var/lib/radarr
+  /var/lib/prowlarr
+  /var/lib/jellyfin
+)
+
+backup_nvme_dbs() {
+  local target_disk root next current previous created
+  created="$(date -u +%FT%TZ)"
+  for target_disk in 1 2 3; do
+    root="/mnt/disk${target_disk}/pool/backups/nvme-db"
+    next="$root/.next"
+    current="$root/current"
+    previous="$root/.previous"
+    install -d -o "$backup_owner" -g "$backup_group" -m 2770 "$root"
+    rm -rf -- "$next" "$previous"
+    install -d -o "$backup_owner" -g "$backup_group" -m 2770 "$next"
+    for src in "${NVME_DB_DIRS[@]}"; do
+      [[ -d "$src" ]] || { echo "NVMe DB dir missing, skipping: $src" >&2; continue; }
+      # --numeric-ids preserves the original UID/GID (critical for postgres 999).
+      # No chown here — unlike docker-state above, DB ownership must survive.
+      ionice -c 3 nice -n 10 rsync -aHAX --numeric-ids --delete "$src/" "$next/$(basename "$src")/"
+    done
+    printf created_at=%sn "$created" >"$next/MANIFEST"
+    # Root dir owned by backup user for browsability; contents keep real ownership.
+    chown "$backup_owner:$backup_group" "$next"
+    [[ ! -d "$current" ]] || mv -- "$current" "$previous"
+    mv -- "$next" "$current"
+    rm -rf -- "$previous"
+    echo "Backed up NVMe DBs to $current"
+  done
+}
+
+backup_nvme_dbs
