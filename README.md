@@ -153,3 +153,15 @@ Compose files use unqualified `ports: ["8080:8080"]` (binds 0.0.0.0, all
 interfaces). Do not pin to a LAN IP — the NAS IP changes across rebuilds
 and Tailscale must also reach the services. Host firewall (nftables) is the
 access control layer, not the bind address.
+
+### Manual secrets setup (not in git)
+
+After bootstrap, configure these manually on the NAS:
+
+- `/etc/nas-notify.env` — copy from `nas/config/nas-notify.env.example`,
+  set the Discord webhook URL, chmod 0600, chown root:root. Never commit
+  the real file.
+- Workstation monitor SSH key — generate on the NAS if missing:
+  `ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C nas-workstation-monitor`.
+  The public key is pinned at `nas/config/ssh/workstation-monitor.pub`;
+  add it to each workstation's `~/.ssh/authorized_keys`.
