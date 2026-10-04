@@ -83,6 +83,9 @@ configure_users() {
     target_run useradd -m "$NAS_USER"
   fi
   target_run usermod -aG "wheel,docker,$NAS_GROUP" "$NAS_USER"
+  if [[ -n "$NAS_USER_PASSWORD" ]]; then
+    echo "$NAS_USER:$NAS_USER_PASSWORD" | target_run chpasswd
+  fi
   warn "Group membership changes require a new login."
 }
 
