@@ -21,6 +21,7 @@ PACMAN_PACKAGES=(
   kitty-terminfo
   fd
   the_silver_searcher
+  gdu
   openssh
   inetutils
   rsync
