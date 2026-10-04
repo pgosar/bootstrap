@@ -144,3 +144,12 @@ other credential-bearing values.
 Both environments have a disposable QEMU harness under `<env>/qemu/`.
 The host-side launcher is separated from the guest-side stage scripts and the
 read-only checks so the structure is obvious.
+
+## NAS operational conventions
+
+### Docker port bindings
+
+Compose files use unqualified `ports: ["8080:8080"]` (binds 0.0.0.0, all
+interfaces). Do not pin to a LAN IP — the NAS IP changes across rebuilds
+and Tailscale must also reach the services. Host firewall (nftables) is the
+access control layer, not the bind address.
