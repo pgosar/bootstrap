@@ -174,6 +174,10 @@ install_aur_packages() {
   [[ "$uid" != "0" ]] || die "AUR builds must not run as root"
 
   # Bootstrap yay first via makepkg, then use yay for the rest
+  # yay needs passwordless sudo for pacman (it calls sudo pacman -U internally)
+  # Minimal privilege: only pacman, not all commands
+  printf "%s ALL=(ALL) NOPASSWD: /usr/bin/pacman\n" "$NAS_USER" | target_run tee /etc/sudoers.d/10-yay-pacman >/dev/null
+  target_run chmod 440 /etc/sudoers.d/10-yay-pacman
   build_aur_package_with_makepkg "yay"
 
   local package
