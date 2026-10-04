@@ -190,3 +190,15 @@ setup_fnm() {
   # zshrc (eval "$(fnm env --use-on-cd)") provides node/npm.
   target_run sudo -Hu "$NAS_USER" bash -lc "fnm install --lts && fnm default lts-latest"
 }
+
+setup_rust() {
+  [[ "$PACKAGES" == true ]] || return 0
+
+  if [[ "$APPLY" != true ]]; then
+    log "+ install Rust via rustup for $NAS_USER"
+    return 0
+  fi
+
+  # Install rustup and stable toolchain for the NAS user.
+  target_run sudo -Hu "$NAS_USER" bash -lc "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path"
+}
