@@ -27,7 +27,10 @@ configure_data_disk() {
     run mount -o "$BTRFS_DATA_MOUNT_OPTS" "$disk" "$active_mountpoint"
   fi
 
-  ensure_dir "$active_mountpoint/pool"
+  # pool must be a btrfs subvolume (btrbk snapshots it)
+  if [[ ! -e "$active_mountpoint/pool" ]]; then
+    run btrfs subvolume create "$active_mountpoint/pool"
+  fi
   ensure_dir "$active_mountpoint/snapshots"
   run chown "$PUID:$PGID" "$active_mountpoint/pool"
   run chmod 0775 "$active_mountpoint/pool"
@@ -429,7 +432,7 @@ configure_storage() {
   generate_fstab_file
   # FUSE allow_other requires user_allow_other in /etc/fuse.conf
   # otherwise the mount option is silently ignored.
-  write_text "$(target_path /etc/fuse.conf)" "user_allow_other\n"
+  write_text "$(target_path /etc/fuse.conf)" $'user_allow_other\n'
   generate_mergerfs_mount_units
   if [[ "$APPLY" == true ]]; then
     if [[ "$TARGET_MODE" == "host" ]]; then
