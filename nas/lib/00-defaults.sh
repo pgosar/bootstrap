@@ -140,6 +140,17 @@ MERGERFS_CREATE_POLICY="mfs"
 DOCKER_ROOT="/data/docker"
 DOCKER_COMPOSE_DIR="/data/docker/compose"
 DOCKER_APPDATA_DIR="/data/docker/appdata"
+# Local SSD database directories for SQLite/BoltDB state (kept off mergerfs).
+# Format: "path:uid:gid:mode". UID/GID match the live NAS state.
+SSD_DB_DIRS=(
+  "/var/lib/immich-postgres:999:4:0700"
+  "/var/lib/tdarr-server:root:root:0755"
+  "/var/lib/scrutiny-influxdb:root:root:0755"
+  "/var/lib/sonarr:1000:1000:0755"
+  "/var/lib/radarr:1000:1000:0755"
+  "/var/lib/prowlarr:1000:1000:0755"
+  "/var/lib/jellyfin:1000:1000:0755"
+)
 NAS_DOCKER_REPO_REQUIRED="true"
 NAS_DOCKER_REPO_SOURCE=""
 NAS_DOCKER_REPO_BRANCH="main"
