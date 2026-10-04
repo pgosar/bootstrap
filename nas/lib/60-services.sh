@@ -57,6 +57,9 @@ configure_operations_basics() {
   copy_with_backup "$NAS_ROOT/config/systemd/workstation-state-recorder.service" "$(target_path /etc/systemd/system/workstation-state-recorder.service)"
   run sed -i -e "s/__STATE_USER__/$NAS_USER/g" -e "s/__STATE_GROUP__/$NAS_GROUP/g" "$(target_path /etc/systemd/system/workstation-state-recorder.service)"
   copy_with_backup "$NAS_ROOT/config/systemd/workstation-state-recorder.timer" "$(target_path /etc/systemd/system/workstation-state-recorder.timer)"
+  # Arch does not ship logrotate systemd units; install our own.
+  copy_with_backup "$NAS_ROOT/config/systemd/logrotate.service" "$(target_path /etc/systemd/system/logrotate.service)"
+  copy_with_backup "$NAS_ROOT/config/systemd/logrotate.timer" "$(target_path /etc/systemd/system/logrotate.timer)"
   ensure_dir "$(target_path /data/personal/system-state/nas)"
   ensure_dir "$(target_path /data/personal/system-state/pc)"
   run chown -R "$PUID:$PGID" "$(target_path /data/personal/system-state)"
