@@ -129,6 +129,7 @@ main() {
     configure_users
     install_aur_packages
     setup_fnm
+    setup_rust
   fi
   [[ "$STORAGE" == true ]] && configure_storage
   [[ "$SERVICES" == true ]] && configure_services
