@@ -83,6 +83,8 @@ configure_users() {
     target_run useradd -m "$NAS_USER"
   fi
   target_run usermod -aG "wheel,docker,$NAS_GROUP" "$NAS_USER"
+  # Set zsh as default shell (installed via PACMAN_PACKAGES).
+  target_run chsh -s /bin/zsh "$NAS_USER"
   if [[ -n "$NAS_USER_PASSWORD" ]]; then
     echo "$NAS_USER:$NAS_USER_PASSWORD" | target_run chpasswd
   fi
