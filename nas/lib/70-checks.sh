@@ -413,7 +413,7 @@ check_managed_config_artifacts() {
       ;;
     btrfs-scrub.sh) installed_path="/usr/local/bin/nas-btrfs-scrub"; expected_mode="755" ;;
     nas-secrets) installed_path="/usr/local/bin/nas-secrets"; expected_mode="755" ;;
-    snapraid-sync.sh | snapraid-scrub.sh) installed_path="/usr/local/bin/$source_name"; expected_mode="755" ;;
+    snapraid-sync.sh | snapraid-scrub.sh | minecraft-sync.sh) installed_path="/usr/local/bin/$source_name"; expected_mode="755" ;;
     nas-*) installed_path="/usr/local/sbin/$source_name"; expected_mode="755" ;;
     *)
       check_fail "bootstrap config source has an explicit installed-artifact check: $source_name"
