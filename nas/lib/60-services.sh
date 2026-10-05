@@ -88,6 +88,8 @@ configure_operations_basics() {
   run chmod 0755 "$(target_path /usr/local/sbin/nas-bootstrap-test)"
   copy_with_backup "$NAS_ROOT/config/minecraft-sync.sh" "$(target_path /usr/local/bin/minecraft-sync.sh)"
   run chmod 0755 "$(target_path /usr/local/bin/minecraft-sync.sh)"
+  copy_with_backup "$NAS_ROOT/config/atuin-server-setup.sh" "$(target_path /usr/local/bin/atuin-server-setup.sh)"
+  run chmod 0755 "$(target_path /usr/local/bin/atuin-server-setup.sh)"
   for unit in nas-recent-files.service nas-recent-files.timer nas-duplicate-report.service nas-duplicate-report.timer nas-uptime-ledger.service nas-uptime-ledger.timer nas-container-health-alert.service nas-container-health-alert.timer nas-systemd-failure-alert.service nas-systemd-failure-alert.timer nas-workstation-smart-monitor.service nas-workstation-smart-monitor.timer nas-container-image-monitor.service nas-container-image-monitor.timer nas-nextcloud-external-scan.service nas-nextcloud-external-scan.timer nas-ssd-image-backup.service nas-ssd-image-backup.timer nas-systemd-health-check.service nas-systemd-health-check.timer nas-bootstrap-test.service nas-bootstrap-test.timer minecraft-sync.path minecraft-sync.service minecraft-sync.timer; do
     copy_with_backup "$NAS_ROOT/config/systemd/$unit" "$(target_path "/etc/systemd/system/$unit")"
   done
