@@ -96,7 +96,7 @@ while IFS= read -r relative_path; do
         candidate="${data_root%/}/$relative_path"
         if [[ -f "$candidate" && ! -s "$candidate" ]]; then
             zero_update_paths+=("$relative_path")
-            if [[ ! "$relative_path" =~ ^backups/docker-state/[^/]+/current/ ]]; then
+            if [[ ! "$relative_path" =~ ^backups/(docker-state|nvme-db)/[^/]+/current/ ]]; then
                 unsafe_zero_update_paths+=("$relative_path")
             fi
             break

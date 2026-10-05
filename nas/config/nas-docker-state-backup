@@ -74,3 +74,74 @@ backup_disk() {
 backup_disk 1 2
 backup_disk 2 3
 backup_disk 3 1
+
+# NVMe-hosted application databases live outside the btrfs data-disk snapshots.
+# Back them up with rsync, preserving numeric ownership (do NOT chown — database
+# processes require specific UIDs, e.g. postgres 999). Replicated to all three
+# data disks for cross-disk redundancy.
+NVME_DB_DIRS=(
+  /var/lib/immich-postgres
+  /var/lib/tdarr-server
+  /var/lib/scrutiny-influxdb
+  /var/lib/sonarr
+  /var/lib/radarr
+  /var/lib/prowlarr
+  /var/lib/jellyfin
+)
+
+backup_nvme_dbs() {
+  local target_disk root next current previous created
+  created="$(date -u +%FT%TZ)"
+  for target_disk in 1 2 3; do
+    root="/mnt/disk${target_disk}/pool/backups/nvme-db"
+    next="$root/.next"
+    current="$root/current"
+    previous="$root/.previous"
+    install -d -o "$backup_owner" -g "$backup_group" -m 2770 "$root"
+    rm -rf -- "$next" "$previous"
+    install -d -o "$backup_owner" -g "$backup_group" -m 2770 "$next"
+    for src in "${NVME_DB_DIRS[@]}"; do
+      [[ -d "$src" ]] || { echo "NVMe DB dir missing, skipping: $src" >&2; continue; }
+      # --numeric-ids preserves the original UID/GID (critical for postgres 999).
+      # No chown here — unlike docker-state above, DB ownership must survive.
+      ionice -c 3 nice -n 10 rsync -aHAX --numeric-ids --delete "$src/" "$next/$(basename "$src")/"
+    done
+    printf created_at=%s\n "$created" >"$next/MANIFEST"
+    # Root dir owned by backup user for browsability; contents keep real ownership.
+    chown "$backup_owner:$backup_group" "$next"
+    [[ ! -d "$current" ]] || mv -- "$current" "$previous"
+    mv -- "$next" "$current"
+    rm -rf -- "$previous"
+    echo "Backed up NVMe DBs to $current"
+  done
+}
+
+backup_nvme_dbs
+
+# Logical PostgreSQL dumps (transaction-consistent, preferred recovery path).
+backup_pg_dumps() {
+  local target_disk root dest
+  for target_disk in 1 2 3; do
+    root="/mnt/disk${target_disk}/pool/backups/nvme-db/current"
+    dest="$root/pg-dumps"
+    install -d -o "$backup_owner" -g "$backup_group" -m 2770 "$dest"
+    docker exec immich_postgres sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' >"$dest/immich.sql" 2>/dev/null && echo "pg_dump immich OK" || echo "pg_dump immich FAILED" >&2
+    docker exec nextcloud_postgres sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' >"$dest/nextcloud.sql" 2>/dev/null && echo "pg_dump nextcloud OK" || echo "pg_dump nextcloud FAILED" >&2
+  done
+}
+# Transaction-consistent SQLite dumps via online backup API.
+backup_sqlite_dumps() {
+  local target_disk root dest
+  for target_disk in 1 2 3; do
+    root="/mnt/disk${target_disk}/pool/backups/nvme-db/current"
+    dest="$root/sqlite-dumps"
+    install -d -o "$backup_owner" -g "$backup_group" -m 2770 "$dest"
+    for pair in "sonarr:/var/lib/sonarr/sonarr.db" "radarr:/var/lib/radarr/radarr.db" "prowlarr:/var/lib/prowlarr/prowlarr.db"; do
+      n="${pair%%:*}"; db="${pair#*:}"
+      [[ -f "$db" ]] && sqlite3 "$db" ".dump" >"$dest/${n}.sql" 2>/dev/null && echo "sqlite $n OK" || echo "sqlite $n FAILED" >&2
+    done
+  done
+}
+
+backup_pg_dumps
+backup_sqlite_dumps

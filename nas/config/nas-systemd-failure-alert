@@ -60,7 +60,7 @@ if [[ "$current" != "$previous" && "$NO_NOTIFY" != "true" ]]; then
       message+=$'\n'
     done <"$tmp_recovered"
   fi
-  /usr/local/sbin/nas-notify systemd "$message"
+  /usr/local/sbin/nas-notify systemd "$message" || true
 fi
 
 jq -n \
