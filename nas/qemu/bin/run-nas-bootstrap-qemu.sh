@@ -151,6 +151,7 @@ cp -a "$NAS_DIR/qemu/checks/verify-installed-health.sh" "$STAGED_REPO/nas/qemu/c
 cp -a "$NAS_DIR/qemu/qemu-nas.env" "$STAGED_REPO/nas/qemu/qemu-nas.env"
 cp -a "$NAS_DOCKER_BUNDLE" "$STAGED_REPO/nas/qemu/nas-docker.bundle"
 cp -a "$NAS_DIR/qemu/README.md" "$STAGED_REPO/nas/qemu/README.md"
+cp -a "$ROOT_DIR/common" "$STAGED_REPO/common"
 [[ -f "$ROOT_DIR/README.md" ]] && cp -a "$ROOT_DIR/README.md" "$STAGED_REPO/README.md"
 [[ -f "$ROOT_DIR/.gitignore" ]] && cp -a "$ROOT_DIR/.gitignore" "$STAGED_REPO/.gitignore"
 find "$STAGED_REPO" \
