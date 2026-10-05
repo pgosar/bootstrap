@@ -80,7 +80,15 @@ configure_operations_basics() {
   run chmod 0755 "$(target_path /usr/local/sbin/nas-container-image-monitor)"
   copy_with_backup "$NAS_ROOT/config/nas-nextcloud-external-scan" "$(target_path /usr/local/sbin/nas-nextcloud-external-scan)"
   run chmod 0755 "$(target_path /usr/local/sbin/nas-nextcloud-external-scan)"
-  for unit in nas-recent-files.service nas-recent-files.timer nas-duplicate-report.service nas-duplicate-report.timer nas-uptime-ledger.service nas-uptime-ledger.timer nas-container-health-alert.service nas-container-health-alert.timer nas-systemd-failure-alert.service nas-systemd-failure-alert.timer nas-workstation-smart-monitor.service nas-workstation-smart-monitor.timer nas-container-image-monitor.service nas-container-image-monitor.timer nas-nextcloud-external-scan.service nas-nextcloud-external-scan.timer; do
+  copy_with_backup "$NAS_ROOT/config/nas-ssd-image-backup" "$(target_path /usr/local/sbin/nas-ssd-image-backup)"
+  run chmod 0755 "$(target_path /usr/local/sbin/nas-ssd-image-backup)"
+  copy_with_backup "$NAS_ROOT/config/nas-systemd-health-check" "$(target_path /usr/local/sbin/nas-systemd-health-check)"
+  run chmod 0755 "$(target_path /usr/local/sbin/nas-systemd-health-check)"
+  copy_with_backup "$NAS_ROOT/config/nas-bootstrap-test" "$(target_path /usr/local/sbin/nas-bootstrap-test)"
+  run chmod 0755 "$(target_path /usr/local/sbin/nas-bootstrap-test)"
+  copy_with_backup "$NAS_ROOT/config/minecraft-sync.sh" "$(target_path /usr/local/bin/minecraft-sync.sh)"
+  run chmod 0755 "$(target_path /usr/local/bin/minecraft-sync.sh)"
+  for unit in nas-recent-files.service nas-recent-files.timer nas-duplicate-report.service nas-duplicate-report.timer nas-uptime-ledger.service nas-uptime-ledger.timer nas-container-health-alert.service nas-container-health-alert.timer nas-systemd-failure-alert.service nas-systemd-failure-alert.timer nas-workstation-smart-monitor.service nas-workstation-smart-monitor.timer nas-container-image-monitor.service nas-container-image-monitor.timer nas-nextcloud-external-scan.service nas-nextcloud-external-scan.timer nas-ssd-image-backup.service nas-ssd-image-backup.timer nas-systemd-health-check.service nas-systemd-health-check.timer nas-bootstrap-test.service nas-bootstrap-test.timer minecraft-sync.path minecraft-sync.service minecraft-sync.timer; do
     copy_with_backup "$NAS_ROOT/config/systemd/$unit" "$(target_path "/etc/systemd/system/$unit")"
   done
   copy_with_backup "$NAS_ROOT/config/nas-secrets" "$(target_path /usr/local/bin/nas-secrets)"
@@ -449,6 +457,11 @@ enable_services() {
   target_run systemctl enable nas-workstation-smart-monitor.timer
   target_run systemctl enable nas-container-image-monitor.timer
   target_run systemctl enable nas-nextcloud-external-scan.timer
+  target_run systemctl enable nas-ssd-image-backup.timer
+  target_run systemctl enable nas-systemd-health-check.timer
+  target_run systemctl enable nas-bootstrap-test.timer
+  target_run systemctl enable minecraft-sync.path
+  target_run systemctl enable minecraft-sync.timer
   target_run systemctl enable logrotate.timer
   if [[ "$START_SERVICES" == true && "$TARGET_MODE" == "host" ]]; then
     target_run systemctl start systemd-timesyncd.service

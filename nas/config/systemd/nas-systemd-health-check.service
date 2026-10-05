@@ -1,0 +1,7 @@
+[Unit]
+Description=Proactive systemd health check
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nas-systemd-health-check

@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly full SSD image backup (nvme0n1)
+RequiresMountsFor=/mnt/disk1
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nas-ssd-image-backup
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

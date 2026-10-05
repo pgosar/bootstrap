@@ -1,0 +1,6 @@
+[Unit]
+Description=Sync Minecraft data to PC and MacBook
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/minecraft-sync.sh
+User=chilly
