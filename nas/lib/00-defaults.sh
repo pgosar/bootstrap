@@ -15,6 +15,20 @@ PACMAN_PACKAGES=(
   python
   vim
   neovim
+  # Neovim parser builds, Mason installers, search and Git integration.
+  tree-sitter-cli
+  ripgrep
+  unzip
+  python-pip
+  python-virtualenv
+  go
+  cmake
+  lazygit
+  difftastic
+  jre-openjdk-headless
+  cppcheck
+  verilator
+  unixodbc
   tmux
   zsh
   fzf
