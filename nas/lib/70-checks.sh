@@ -375,6 +375,13 @@ check_managed_systemd_units() {
       else
         check_fail "$unit matches bootstrap source with configured user"
       fi
+    elif [[ "$unit" == workstation-state-recorder.service ]]; then
+      # installer renders __STATE_USER__/__STATE_GROUP__ placeholders (60-services.sh)
+      if [[ -f "$installed_file" ]] && cmp -s <(sed -e "s/__STATE_USER__/$NAS_USER/g" -e "s/__STATE_GROUP__/$NAS_GROUP/g" "$source_file") "$installed_file"; then
+        check_pass "$unit matches bootstrap source"
+      else
+        check_fail "$unit matches bootstrap source"
+      fi
     else
       check_file_matches_source "$source_file" "$installed_file" "$unit matches bootstrap source"
     fi
