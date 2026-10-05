@@ -1,0 +1,54 @@
+#!/bin/bash
+# Weekly full SSD image backup for stealth-nas
+# Images /dev/nvme0n1 (119GB NVMe) with zstd compression
+# Keeps 3 most recent images, verifies integrity after creation
+set -euo pipefail
+
+LOG=/var/log/nas-ssd-image-backup.log
+DEST_DIR=/mnt/disk1/pool/backups/system-images
+DATE=$(date +%Y%m%d)
+IMG="$DEST_DIR/nas-nvme-$DATE.img.zst"
+GPT_BAK="$DEST_DIR/nas-nvme-$DATE.gpt.bak"
+
+log() { echo "[$(date '+%F %T')] $*" | tee -a "$LOG"; }
+fail() {
+    log "ERROR: $*"
+    /usr/local/sbin/nas-notify ssd-image-backup "SSD image backup FAILED: $*" || true
+    exit 1
+}
+
+log "Starting SSD image backup"
+
+# Pre-flight: destination must exist with enough free space (~60GB for compressed image)
+[[ -d "$DEST_DIR" ]] || fail "destination $DEST_DIR does not exist"
+free_kb=$(df -k --output=avail "$DEST_DIR" | tail -1)
+[[ "$free_kb" -gt 62914560 ]] || fail "only $((free_kb/1048576))GB free, need 60GB"
+
+# Flush filesystem buffers before imaging a live disk
+sync
+
+# Partition table backup (fast, do first)
+log "Backing up GPT partition table"
+sgdisk --backup="$GPT_BAK" /dev/nvme0n1 >>"$LOG" 2>&1 \
+    || fail "sgdisk partition table backup failed"
+
+# Full disk image, compressed
+log "Imaging /dev/nvme0n1 -> $IMG"
+dd if=/dev/nvme0n1 bs=4M status=progress 2>>"$LOG" | zstd -T0 -f -o "$IMG" 2>>"$LOG" \
+    || fail "dd/zstd imaging failed"
+
+# Integrity verification of the compressed image
+log "Verifying image integrity"
+zstd -t "$IMG" >>"$LOG" 2>&1 || fail "image integrity test failed"
+
+# Retention: keep 3 most recent, delete older
+log "Applying retention (keep 3)"
+ls -t "$DEST_DIR"/nas-nvme-*.img.zst 2>/dev/null | tail -n +4 | while read -r old; do
+    base="${old%.img.zst}"
+    log "Removing old image $old"
+    rm -f "$old" "$base.gpt.bak"
+done
+
+size=$(du -h "$IMG" | cut -f1)
+log "Backup complete: $IMG ($size), verified OK"
+/usr/local/sbin/nas-notify ssd-image-backup "SSD image backup complete: nas-nvme-$DATE.img.zst ($size), verified OK" || true

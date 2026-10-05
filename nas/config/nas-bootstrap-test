@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+#
+# nas-bootstrap-test — monthly end-to-end test of the NAS bootstrap repo.
+#
+# Boots a QEMU VM from the Arch ISO, runs the full bootstrap install inside
+# the guest (stage1), reboots into the installed system and runs the health
+# verification (stage2). Pass/fail is logged; failures notify via nas-notify.
+#
+# The test needs up to ~3.5h and ~4GB RAM. It uses its own workdir, ports
+# (18080/2222) and user-mode networking, so it does not touch production.
+
+set -euo pipefail
+
+LOG="/var/log/nas-bootstrap-test.log"
+WORKDIR="/var/tmp/nas-bootstrap-test-work"
+BOOTSTRAP_REPO="/home/chilly/bootstrap"
+NAS_DOCKER_REPO="/home/chilly/code/nas-docker"
+ISO_PATH="/data/media/linux-isos/archlinux-latest-x86_64.iso"
+ISO_URL="https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso"
+BUNDLE="/tmp/nas-docker-test.bundle"
+GIT="git -c safe.directory=$BOOTSTRAP_REPO -c safe.directory=$NAS_DOCKER_REPO"
+
+log() {
+  printf '%s %s\n' "$(date '+%F %T')" "$*" | tee -a "$LOG"
+}
+
+fail() {
+  log "RESULT: FAIL — $*"
+  /usr/local/sbin/nas-notify nas-bootstrap-test "Bootstrap QEMU test FAILED: $*" || true
+  exit 1
+}
+
+mkdir -p "$(dirname "$LOG")"
+touch "$LOG"
+log "== nas-bootstrap-test starting =="
+
+# Best-effort freshness: test the latest committed state, but never let a
+# dirty tree or network hiccup abort the run; test the local checkout instead.
+if $GIT -C "$BOOTSTRAP_REPO" pull --ff-only >>"$LOG" 2>&1; then
+  log "bootstrap repo fast-forwarded to latest main"
+else
+  log "WARN: could not fast-forward bootstrap repo; testing local checkout"
+fi
+
+# Arch ISO: reuse the local copy, download the latest release if missing.
+if [[ ! -f "$ISO_PATH" ]]; then
+  log "Arch ISO not found at $ISO_PATH; downloading latest release..."
+  mkdir -p "$(dirname "$ISO_PATH")"
+  curl -fSL --retry 3 -o "$ISO_PATH" "$ISO_URL" >>"$LOG" 2>&1 \
+    || fail "could not download Arch ISO from $ISO_URL"
+fi
+log "using ISO: $ISO_PATH"
+
+# Fresh nas-docker bundle so the guest installs the current Docker source.
+rm -f "$BUNDLE"
+mkdir -p "$WORKDIR"
+$GIT -C "$NAS_DOCKER_REPO" bundle create "$BUNDLE" --all >>"$LOG" 2>&1 \
+  || fail "could not create nas-docker git bundle"
+log "nas-docker bundle created: $(du -h "$BUNDLE" | cut -f1)"
+
+# Run the two-stage QEMU bootstrap test. --force recreates the workdir,
+# making reruns idempotent.
+log "launching QEMU bootstrap test (may take up to ~3.5h)..."
+if QEMU_WORKDIR="$WORKDIR" \
+   NAS_DOCKER_BUNDLE="$BUNDLE" \
+   ARCH_ISO="$ISO_PATH" \
+   NAS_DOCKER_BUNDLE="$BUNDLE" bash "$BOOTSTRAP_REPO/nas/qemu/bin/run-nas-bootstrap-qemu.sh" --force "$ISO_PATH" >>"$LOG" 2>&1; then
+  log "RESULT: PASS — bootstrap produced a healthy system in QEMU"
+  log "guest logs: $WORKDIR/logs"
+else
+  fail "run-nas-bootstrap-qemu.sh exited nonzero; see $WORKDIR/logs and $LOG"
+fi

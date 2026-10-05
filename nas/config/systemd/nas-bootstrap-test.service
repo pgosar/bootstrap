@@ -1,0 +1,15 @@
+[Unit]
+Description=Monthly QEMU end-to-end test of the NAS bootstrap
+Documentation=file:/data/personal/second-brain/areas/homelab/nas.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nas-bootstrap-test
+# The guest install (stage1) allows up to 90m and the health verification
+# (stage2) up to 120m, plus staging overhead.
+TimeoutStartSec=6h
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

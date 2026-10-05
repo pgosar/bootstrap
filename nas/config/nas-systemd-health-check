@@ -1,0 +1,28 @@
+#!/bin/bash
+# Proactive systemd health check - runs every 15 min
+set -uo pipefail
+LOG="/var/log/nas-systemd-health-check.log"
+NOTIFY="/usr/local/sbin/nas-notify"
+log() { echo "$(date -Iseconds) $*" >>"$LOG"; }
+# Skip the bullet character, get actual unit names (2nd field)
+failed=$(systemctl --failed --no-legend --no-pager 2>/dev/null | awk "{print \$2}" | grep -E "\.(service|timer|mount)$" || true)
+[[ -z "$failed" ]] && exit 0
+log "FAILED UNITS DETECTED:"
+log "$failed"
+units_str=$(echo $failed | tr "\n" " ")
+[[ -x "$NOTIFY" ]] && "$NOTIFY" systemd-health "Failed units: $units_str" || true
+for unit in $failed; do
+  log "Attempting recovery for $unit"
+  systemctl reset-failed "$unit" 2>/dev/null || true
+  if [[ "$unit" == *.service ]]; then
+    systemctl restart "$unit" 2>/dev/null && log "Restarted $unit OK" || log "Restart $unit FAILED"
+  fi
+done
+still_failed=$(systemctl --failed --no-legend --no-pager 2>/dev/null | awk "{print \$2}" | grep -E "\.(service|timer|mount)$" || true)
+if [[ -n "$still_failed" ]]; then
+  log "STILL FAILED: $still_failed"
+  units_str=$(echo $still_failed | tr "\n" " ")
+  [[ -x "$NOTIFY" ]] && "$NOTIFY" systemd-health "Still failed after recovery: $units_str" || true
+fi
+log "Health check complete"
+exit 0

@@ -1,0 +1,6 @@
+[Unit]
+Description=Watch Minecraft data for changes
+[Path]
+PathChanged=/data/replicas/minecraft
+[Install]
+WantedBy=multi-user.target
