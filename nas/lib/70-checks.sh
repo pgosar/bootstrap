@@ -844,7 +844,7 @@ check_common_snapraid_btrbk_samba() {
     check_unit_enabled snapraid-sync.timer true
     check_unit_enabled snapraid-scrub.timer true
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-sync.sh)" "/run/lock/snapraid-operation.lock" "SnapRAID sync uses the shared operation lock"
-    check_file_contains_literal "$(target_path /usr/local/bin/snapraid-sync.sh)" "^backups/docker-state/[^/]+/current/" "SnapRAID sync scopes automatic zero-byte handling to Docker-state replicas"
+    check_file_contains_literal "$(target_path /usr/local/bin/snapraid-sync.sh)" "^backups/(docker-state|nvme-db)/[^/]+/current/" "SnapRAID sync scopes automatic zero-byte handling to Docker-state replicas"
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-sync.sh)" "sync_args+=(--force-zero)" "SnapRAID sync supports reviewed zero-byte transitions"
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-scrub.sh)" "/run/lock/snapraid-operation.lock" "SnapRAID scrub uses the shared operation lock"
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-scrub.sh)" "latest SnapRAID sync result" "SnapRAID scrub defers after a failed sync"
@@ -1029,7 +1029,9 @@ check_common_services() {
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-uptime-ledger)" \
     "nas-docker-state-backup.service" "uptime ledger reports Docker-state backup results"
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-uptime-ledger)" \
-    '"list-units", "--failed"' "uptime ledger reports all failed systemd units"
+    '"list-units",' "uptime ledger reports all failed systemd units"
+  check_file_contains_literal "$(target_path /usr/local/sbin/nas-uptime-ledger)" \
+    '"--failed",' "uptime ledger reports all failed systemd units"
   check_path_exists "$(target_path /etc/profile.d/nas-kernel-reminder.sh)"
   check_file_contains_literal "$(target_path /etc/profile.d/nas-kernel-reminder.sh)" "IgnorePkg includes linux/linux-headers" "kernel reminder documents pacman pin"
   check_path_exists "$(target_path /usr/local/sbin/nas-kernel-maintenance-reminder)"
@@ -1096,7 +1098,7 @@ check_common_services() {
   check_path_exists "$(target_path /etc/systemd/system/nas-workstation-smart-monitor.service)"
   check_path_exists "$(target_path /etc/systemd/system/nas-workstation-smart-monitor.timer)"
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-workstation-smart-monitor)" \
-    "host was not woken" "workstation SMART monitor skips sleeping hosts"
+    "without waking hosts" "workstation SMART monitor skips sleeping hosts"
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-workstation-smart-monitor)" \
     "All monitored PC and MacBook disks recovered" "workstation SMART monitor reports recovery transitions"
   check_unit_enabled nas-workstation-smart-monitor.timer true
