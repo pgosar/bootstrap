@@ -77,6 +77,14 @@ PACMAN_PACKAGES=(
   wol
   fclones
   fnm
+  # Monthly bootstrap QEMU end-to-end test dependencies.
+  qemu-system-x86
+  qemu-img
+  edk2-ovmf
+  # Shell history sync, system monitor, GitHub CLI.
+  atuin
+  btop
+  github-cli
 )
 
 PACMAN_IGNORE_PACKAGES=(
