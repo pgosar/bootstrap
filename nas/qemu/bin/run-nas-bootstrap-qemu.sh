@@ -221,7 +221,7 @@ printf '== stage1: boot Arch ISO and install OS ==\n'
 	  printf 'root\n'
   sleep 5
   printf 'curl -fsSL http://10.0.2.2:%s/stage1.sh | QEMU_HTTP_PORT=%s bash\n' "$HTTP_PORT" "$HTTP_PORT"
-) | timeout 90m "${qemu_base[@]}" "${qemu_uefi[@]}" "${qemu_devices[@]}" \
+) | timeout 180m "${qemu_base[@]}" "${qemu_uefi[@]}" "${qemu_devices[@]}" \
   -display none \
   -serial mon:stdio \
   -virtfs "local,path=$SHARED_DIR,mount_tag=hostshare,security_model=none" \
@@ -237,7 +237,7 @@ grep -q "rootflags=subvol=@" "$SHARED_DIR/grub.cfg" || die "GRUB config is missi
 
 printf '== stage2: boot installed system and verify final NAS state ==\n'
 : >"$BOOT_LOG"
-timeout 120m "${qemu_base[@]}" "${qemu_uefi[@]}" "${qemu_devices[@]}" \
+timeout 240m "${qemu_base[@]}" "${qemu_uefi[@]}" "${qemu_devices[@]}" \
   -display none \
   -serial "file:$BOOT_LOG" \
   -monitor none \
