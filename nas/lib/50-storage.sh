@@ -161,7 +161,7 @@ generate_mergerfs_mount_units() {
   local data_unit snapshot_unit data_text snapshot_text
   data_unit="$(target_path "/etc/systemd/system/$(mount_unit_name_for_path "$MERGERFS_MOUNT")")"
   snapshot_unit="$(target_path "/etc/systemd/system/$(mount_unit_name_for_path "$SNAPSHOT_VIEW_MOUNT")")"
-  data_text="$(generate_mergerfs_mount_unit_text "$MERGERFS_MOUNT" pool "defaults,allow_other,cache.files=off,use_ino,ignorepponrename=true,category.create=$MERGERFS_CREATE_POLICY,moveonenospc=true,minfreespace=$MERGERFS_MIN_FREE_SPACE")"
+  data_text="$(generate_mergerfs_mount_unit_text "$MERGERFS_MOUNT" pool "defaults,allow_other,use_ino,ignorepponrename=true,category.create=$MERGERFS_CREATE_POLICY,moveonenospc=true,minfreespace=$MERGERFS_MIN_FREE_SPACE,func.getattr=newest")"
   snapshot_text="$(generate_mergerfs_mount_unit_text "$SNAPSHOT_VIEW_MOUNT" snapshots "defaults,ro,cache.files=off")"
   write_text "$data_unit" "$data_text"
   write_text "$snapshot_unit" "$snapshot_text"
@@ -281,7 +281,7 @@ mount_live_mergerfs_explicit() {
   mergerfs_bin="$TARGET_ROOT/usr/bin/mergerfs"
   mergerfs_loader="$TARGET_ROOT/usr/lib/ld-linux-x86-64.so.2"
   mergerfs_lib_path="$TARGET_ROOT/usr/lib"
-  data_opts="defaults,allow_other,cache.files=off,use_ino,ignorepponrename=true,category.create=$MERGERFS_CREATE_POLICY,moveonenospc=true,minfreespace=$MERGERFS_MIN_FREE_SPACE"
+  data_opts="defaults,allow_other,use_ino,ignorepponrename=true,category.create=$MERGERFS_CREATE_POLICY,moveonenospc=true,minfreespace=$MERGERFS_MIN_FREE_SPACE,func.getattr=newest"
   snapshot_opts="defaults,ro,cache.files=off"
 
   ensure_dir "$active_pool_mount"
