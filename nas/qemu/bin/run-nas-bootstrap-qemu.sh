@@ -214,20 +214,16 @@ HEALTH_LOG="$LOG_DIR/qemu-health.log"
 FINAL_LOG="$LOG_DIR/final-verification.log"
 
 printf '== stage1: boot Arch ISO and install OS ==\n'
-(
-	  sleep 5
-	  printf 'e console=ttyS0,115200n8\n'
-	  sleep 45
-	  printf 'root\n'
-  sleep 5
-  printf 'curl -fsSL http://10.0.2.2:%s/stage1.sh | QEMU_HTTP_PORT=%s bash\n' "$HTTP_PORT" "$HTTP_PORT"
-) | timeout 180m "${qemu_base[@]}" "${qemu_uefi[@]}" "${qemu_devices[@]}" \
+# Python driver waits for actual prompts (GRUB -> login -> shell) instead of
+# fixed sleeps. Fixed sleeps are unreliable: guest boot time varies.
+HTTP_PORT="$HTTP_PORT" INSTALL_LOG="$INSTALL_LOG" \
+  timeout 180m python3 "$NAS_DIR/qemu/bin/stage1_driver.py" \
+  "${qemu_base[@]}" "${qemu_uefi[@]}" "${qemu_devices[@]}" \
   -display none \
   -serial stdio \
   -monitor none \
   -virtfs "local,path=$SHARED_DIR,mount_tag=hostshare,security_model=none" \
-  -drive "file=$ISO_PATH,media=cdrom,readonly=on,if=ide" \
-  | tee "$INSTALL_LOG"
+  -drive "file=$ISO_PATH,media=cdrom,readonly=on,if=ide"
 
 grep -q "install post-reboot verifier" "$INSTALL_LOG" \
   || die "stage1 did not appear to complete the one-phase bootstrap install"
