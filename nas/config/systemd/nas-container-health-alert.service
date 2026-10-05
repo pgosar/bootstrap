@@ -6,3 +6,4 @@ Requires=docker.service
 [Service]
 Type=oneshot
 ExecStart=/usr/local/sbin/nas-container-health-alert
+SuccessExitStatus=1
