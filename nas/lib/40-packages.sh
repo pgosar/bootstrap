@@ -227,10 +227,12 @@ setup_cargo_tools() {
 
   # Shell essentials from dotfiles plus user-requested tools.
   # Skip if already installed (idempotent).
+  # Note: rustup was installed with --no-modify-path, so explicitly add
+  # ~/.cargo/bin to PATH for these invocations.
   local tools=(cargo-cache topgrade tokei starship procs rm-improved vivid zoxide bat)
   for tool in "${tools[@]}"; do
     local bin="$tool"
     [[ "$tool" == "rm-improved" ]] && bin="rip"
-    target_run sudo -Hu "$NAS_USER" bash -lc "command -v $bin >/dev/null || cargo install --locked $tool"
+    target_run sudo -Hu "$NAS_USER" bash -lc "export PATH=\"\$HOME/.cargo/bin:\$PATH\"; command -v $bin >/dev/null || cargo install --locked $tool"
   done
 }
