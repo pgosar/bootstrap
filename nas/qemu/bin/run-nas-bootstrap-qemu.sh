@@ -223,7 +223,8 @@ printf '== stage1: boot Arch ISO and install OS ==\n'
   printf 'curl -fsSL http://10.0.2.2:%s/stage1.sh | QEMU_HTTP_PORT=%s bash\n' "$HTTP_PORT" "$HTTP_PORT"
 ) | timeout 180m "${qemu_base[@]}" "${qemu_uefi[@]}" "${qemu_devices[@]}" \
   -display none \
-  -serial mon:stdio \
+  -serial stdio \
+  -monitor none \
   -virtfs "local,path=$SHARED_DIR,mount_tag=hostshare,security_model=none" \
   -drive "file=$ISO_PATH,media=cdrom,readonly=on,if=ide" \
   | tee "$INSTALL_LOG"
