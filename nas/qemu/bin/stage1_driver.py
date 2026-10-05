@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """Drive QEMU stage1: wait for prompts, send input. Replaces fixed sleeps."""
-import subprocess, sys, time, threading, os
+import subprocess, sys, time, threading, os, re
 
 HTTP_PORT = os.environ.get("HTTP_PORT", "18080")
 QEMU_CMD = sys.argv[1:]
 INSTALL_LOG = os.environ.get("INSTALL_LOG", "/tmp/install.log")
+
+# ANSI escape sequence pattern
+ANSI_RE = re.compile(rb'\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b\(B|\x1b=')
+
+def strip_ansi(data):
+    """Remove ANSI escape sequences for prompt detection."""
+    return ANSI_RE.sub(b'', data)
 
 def main():
     proc = subprocess.Popen(
@@ -56,8 +63,10 @@ def main():
     output_buf = b""
     deadline = time.time() + 120
     while time.time() < deadline and not curl_sent:
-        stripped = output_buf.rstrip()
-        if stripped.endswith(b"#"):
+        # Strip ANSI codes before checking for prompt
+        clean = strip_ansi(output_buf).rstrip()
+        # Look for root@archiso prompt or line ending with #
+        if b"root@archiso" in clean or clean.endswith(b"#"):
             time.sleep(1)
             cmd = "curl -fsSL http://10.0.2.2:" + HTTP_PORT + "/stage1.sh | QEMU_HTTP_PORT=" + HTTP_PORT + " bash\n"
             proc.stdin.write(cmd.encode())
