@@ -170,6 +170,14 @@ configure_firewall() {
   done
   [[ "$has_cidr" == true ]] || die "FIREWALL_LAN_CIDRS is empty"
 
+  local dport dport_csv=""
+  read -r -a docker_ports <<<"${DOCKER_PORTS:-}"
+  for dport in "${docker_ports[@]}"; do
+    [[ -n "$dport" ]] || continue
+    dport_csv+="${dport_csv:+, }$dport"
+  done
+  [[ -n "$dport_csv" ]] || die "DOCKER_PORTS is empty"
+
   backup_file "$(target_path /etc/nftables.conf)"
   write_text "$(target_path /etc/nftables.conf)" "$(
     cat <<EOF
@@ -187,6 +195,12 @@ table inet filter {
     elements = { $cidr_csv }
   }
 
+  # TCP ports published by Docker containers (0.0.0.0 bindings).
+  set docker_ports {
+    type inet_service
+    elements = { $dport_csv }
+  }
+
   chain input {
     type filter hook input priority 0; policy drop;
     iif "lo" accept
@@ -198,6 +212,8 @@ table inet filter {
     tcp dport 3004 ip saddr 172.16.0.0/12 accept
     tcp dport { 139, 445 } ip saddr @lan_cidrs accept
     udp dport { 137, 138 } ip saddr @lan_cidrs accept
+    tcp dport @docker_ports ip saddr @lan_cidrs accept
+    tcp dport @docker_ports ip saddr 172.16.0.0/12 accept
   }
 
   chain forward {
