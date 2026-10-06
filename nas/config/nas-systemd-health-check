@@ -1,28 +1,78 @@
 #!/bin/bash
 # Proactive systemd health check - runs every 15 min
+# v2: tracks consecutive failures, auto-gathers diagnosis bundle on 2nd straight failure
 set -uo pipefail
 LOG="/var/log/nas-systemd-health-check.log"
 NOTIFY="/usr/local/sbin/nas-notify"
+STATE_DIR="/var/lib/nas-systemd-health-check"
+DIAG_DIR="$STATE_DIR/diagnoses"
 log() { echo "$(date -Iseconds) $*" >>"$LOG"; }
+
+mkdir -p "$STATE_DIR" "$DIAG_DIR"
+
 # Skip the bullet character, get actual unit names (2nd field)
 failed=$(systemctl --failed --no-legend --no-pager 2>/dev/null | awk "{print \$2}" | grep -E "\.(service|timer|mount)$" || true)
+
+# Reset counters for units that recovered
+if [[ -d "$STATE_DIR" ]]; then
+  for statefile in "$STATE_DIR"/*.failcount; do
+    [[ -f "$statefile" ]] || continue
+    unit=$(basename "$statefile" .failcount)
+    if ! echo "$failed" | grep -qx "$unit"; then
+      rm -f "$statefile"
+      log "RECOVERED: $unit (failure counter reset)"
+    fi
+  done
+fi
+
 [[ -z "$failed" ]] && exit 0
 log "FAILED UNITS DETECTED:"
 log "$failed"
 units_str=$(echo $failed | tr "\n" " ")
 [[ -x "$NOTIFY" ]] && "$NOTIFY" systemd-health "Failed units: $units_str" || true
+
 for unit in $failed; do
+  # Track consecutive failures
+  countfile="$STATE_DIR/${unit}.failcount"
+  count=0
+  [[ -f "$countfile" ]] && count=$(cat "$countfile" 2>/dev/null || echo 0)
+  count=$((count + 1))
+  echo "$count" > "$countfile"
+  log "$unit: consecutive failure #$count"
+
   log "Attempting recovery for $unit"
   systemctl reset-failed "$unit" 2>/dev/null || true
   if [[ "$unit" == *.service ]]; then
     systemctl restart "$unit" 2>/dev/null && log "Restarted $unit OK" || log "Restart $unit FAILED"
   fi
+
+  # On 2nd consecutive failure: gather diagnosis bundle
+  if [[ "$count" -ge 2 ]]; then
+    diagfile="$DIAG_DIR/${unit}-$(date +%Y%m%d-%H%M%S).txt"
+    {
+      echo "=== DIAGNOSIS BUNDLE for $unit ==="
+      echo "Generated: $(date -Iseconds)"
+      echo "Consecutive failures: $count"
+      echo ""
+      echo "=== systemctl status ==="
+      systemctl status "$unit" --no-pager 2>&1 | head -40
+      echo ""
+      echo "=== journalctl (last 50 lines) ==="
+      journalctl -u "$unit" --no-pager -n 50 2>&1
+    } > "$diagfile" 2>&1
+    log "Diagnosis bundle written: $diagfile"
+
+    # Extract key error lines for the alert
+    errors=$(journalctl -u "$unit" --no-pager -n 50 -p err 2>/dev/null | head -5 | tr '\n' '; ')
+    [[ -z "$errors" ]] && errors="(no error-level lines, see bundle)"
+    [[ -x "$NOTIFY" ]] && "$NOTIFY" systemd-health "INVESTIGATE $unit (failed ${count}x): ${errors}" || true
+    log "Investigation alert sent for $unit"
+  fi
 done
+
 still_failed=$(systemctl --failed --no-legend --no-pager 2>/dev/null | awk "{print \$2}" | grep -E "\.(service|timer|mount)$" || true)
 if [[ -n "$still_failed" ]]; then
   log "STILL FAILED: $still_failed"
-  units_str=$(echo $still_failed | tr "\n" " ")
-  [[ -x "$NOTIFY" ]] && "$NOTIFY" systemd-health "Still failed after recovery: $units_str" || true
 fi
 log "Health check complete"
 exit 0
