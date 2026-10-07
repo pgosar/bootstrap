@@ -1,0 +1,7 @@
+[Unit]
+Description=Route new Immich photos to albums
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/immich-album-router.sh
