@@ -249,6 +249,31 @@ configure_smartd() {
   copy_with_backup "$NAS_ROOT/config/smartd.conf" "$(target_path /etc/smartd.conf)"
 }
 
+configure_nut() {
+  log "Phase: NUT UPS monitoring (APC Back-UPS)"
+  if [[ "$NUT_ENABLE" != "true" ]]; then
+    warn "NUT_ENABLE is false; skipping UPS configuration."
+    return 0
+  fi
+  ensure_dir "$(target_path /etc/nut)"
+  copy_with_backup "$NAS_ROOT/config/nut/ups.conf" "$(target_path /etc/nut/ups.conf)"
+  copy_with_backup "$NAS_ROOT/config/nut/upsd.conf" "$(target_path /etc/nut/upsd.conf)"
+  copy_with_backup "$NAS_ROOT/config/nut/nut.conf" "$(target_path /etc/nut/nut.conf)"
+  copy_with_backup "$NAS_ROOT/config/nut/upssched.conf" "$(target_path /etc/nut/upssched.conf)"
+  copy_with_backup "$NAS_ROOT/config/nut/upssched-cmd" "$(target_path /usr/bin/upssched-cmd)"
+  run chmod 0755 "$(target_path /usr/bin/upssched-cmd)"
+  # Monitor password is generated once and kept out of the repo.
+  if [[ "$APPLY" == true ]]; then
+    if ! target_run test -f /etc/nut/.monpass; then
+      target_run bash -c 'openssl rand -hex 16 > /etc/nut/.monpass && chmod 600 /etc/nut/.monpass'
+    fi
+  fi
+  # upsd.users and upsmon.conf embed the generated password.
+  if [[ "$APPLY" == true ]]; then
+    target_run bash -c 'NUTPASS=$(cat /etc/nut/.monpass); printf "[monuser]\n    password = %s\n    upsmon primary\n" "$NUTPASS" > /etc/nut/upsd.users; printf "MONITOR apc-ups@localhost 1 monuser %s primary\nMINSUPPLIES 1\nSHUTDOWNCMD \"/usr/bin/systemctl poweroff\"\nNOTIFYCMD /usr/bin/upssched\nPOWERDOWNFLAG /etc/killpower\nNOTIFYFLAG ONBATT SYSLOG+EXEC\nNOTIFYFLAG ONLINE SYSLOG+EXEC\nNOTIFYFLAG LOWBATT SYSLOG+EXEC\nRBWARNTIME 43200\nNOCOMMWARNTIME 300\nFINALDELAY 5\n" "$NUTPASS" > /etc/nut/upsmon.conf; chmod 640 /etc/nut/upsd.users /etc/nut/upsmon.conf'
+  fi
+}
+
 configure_snapraid() {
   log "Phase: SnapRAID config and timers"
   if ! target_command_available snapraid; then
@@ -442,6 +467,7 @@ configure_services() {
   configure_swap
   configure_firewall
   configure_smartd
+  configure_nut
   configure_snapraid
   configure_btrbk
   configure_docker
@@ -489,6 +515,17 @@ enable_services() {
     target_run systemctl enable smartd.service
     if [[ "$START_SERVICES" == true && "$TARGET_MODE" == "host" ]]; then
       target_run systemctl start smartd.service
+    fi
+  fi
+  if [[ "$NUT_ENABLE" == "true" ]]; then
+    target_run systemctl enable nut-driver.target
+    target_run systemctl enable nut-driver@apc-ups.service
+    target_run systemctl enable nut-server.service
+    target_run systemctl enable nut-monitor.service
+    if [[ "$START_SERVICES" == true && "$TARGET_MODE" == "host" ]]; then
+      target_run systemctl start nut-driver@apc-ups.service
+      target_run systemctl start nut-server.service
+      target_run systemctl start nut-monitor.service
     fi
   fi
   if [[ "$DOCKER_ENABLE" == "true" ]]; then
