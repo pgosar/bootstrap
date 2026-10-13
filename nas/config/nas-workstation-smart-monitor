@@ -149,6 +149,12 @@ check_host() {
 
   rc=0
   output="$(ssh_remote "$target" "$host_key_alias" "$check_command" 2>&1)" || rc=$?
+  if [[ "$rc" -eq 255 ]]; then
+    # ssh transport failed (host asleep or unreachable mid-check): offline, no new issue.
+    write_offline_status "$host"
+    carry_previous_issue "$host" >>"$tmp_state"
+    return 0
+  fi
   detail="$(printf '%s' "$output" | tr '\n\t' '; ' | sed -E 's/[[:space:]]+/ /g; s/[; ]+$//')"
   if [[ "$rc" -eq 0 ]]; then
     printf '%s\tonline\tok\t%s\n' "$host" "$detail" >>"$tmp_status"
