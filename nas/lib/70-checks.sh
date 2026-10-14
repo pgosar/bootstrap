@@ -853,6 +853,36 @@ check_common_snapraid_btrbk_samba() {
     check_unit_enabled snapraid-scrub.timer true
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-sync.sh)" "/run/lock/snapraid-operation.lock" "SnapRAID sync uses the shared operation lock"
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-sync.sh)" "^backups/(docker-state/[^/]+|nvme-db)/current/" "SnapRAID sync scopes automatic zero-byte handling to Docker-state replicas"
+    # The allowlist only works if it matches the live replica layout:
+    # docker-state replicas sit under a per-disk directory, nvme-db
+    # replicas do not. Test the installed pattern against sample paths
+    # from that layout so the script and this checker cannot drift into
+    # agreeing on the wrong layout again.
+    local snapraid_sync_path zero_pattern sample
+    snapraid_sync_path="$(target_path /usr/local/bin/snapraid-sync.sh)"
+    zero_pattern=""
+    if [[ -f "$snapraid_sync_path" ]]; then
+      zero_pattern="$(grep -oE '\^backups/[^[:space:]]+' "$snapraid_sync_path" | head -n 1)"
+    fi
+    if [[ -z "$zero_pattern" ]]; then
+      check_fail "SnapRAID zero-byte allowlist pattern can be read from snapraid-sync.sh"
+    else
+      check_pass "SnapRAID zero-byte allowlist pattern can be read from snapraid-sync.sh"
+      for sample in "backups/docker-state/disk1/current/example" "backups/nvme-db/current/example"; do
+        if [[ "$sample" =~ $zero_pattern ]]; then
+          check_pass "SnapRAID zero-byte allowlist accepts live replica path $sample"
+        else
+          check_fail "SnapRAID zero-byte allowlist accepts live replica path $sample"
+        fi
+      done
+      for sample in "backups/docker-state/current/example" "backups/nvme-db/disk1/current/example"; do
+        if [[ "$sample" =~ $zero_pattern ]]; then
+          check_fail "SnapRAID zero-byte allowlist rejects non-live replica path $sample"
+        else
+          check_pass "SnapRAID zero-byte allowlist rejects non-live replica path $sample"
+        fi
+      done
+    fi
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-sync.sh)" "sync_args+=(--force-zero)" "SnapRAID sync supports reviewed zero-byte transitions"
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-scrub.sh)" "/run/lock/snapraid-operation.lock" "SnapRAID scrub uses the shared operation lock"
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-scrub.sh)" "latest SnapRAID sync result" "SnapRAID scrub defers after a failed sync"
