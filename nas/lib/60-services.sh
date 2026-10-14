@@ -518,6 +518,7 @@ enable_services() {
     fi
   fi
   if [[ "$NUT_ENABLE" == "true" ]]; then
+    target_run systemctl enable nut.target
     target_run systemctl enable nut-driver.target
     target_run systemctl enable nut-driver@apc-ups.service
     target_run systemctl enable nut-server.service
