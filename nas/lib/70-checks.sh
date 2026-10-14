@@ -852,7 +852,7 @@ check_common_snapraid_btrbk_samba() {
     check_unit_enabled snapraid-sync.timer true
     check_unit_enabled snapraid-scrub.timer true
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-sync.sh)" "/run/lock/snapraid-operation.lock" "SnapRAID sync uses the shared operation lock"
-    check_file_contains_literal "$(target_path /usr/local/bin/snapraid-sync.sh)" "^backups/(docker-state|nvme-db)/current/" "SnapRAID sync scopes automatic zero-byte handling to Docker-state replicas"
+    check_file_contains_literal "$(target_path /usr/local/bin/snapraid-sync.sh)" "^backups/(docker-state/[^/]+|nvme-db)/current/" "SnapRAID sync scopes automatic zero-byte handling to Docker-state replicas"
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-sync.sh)" "sync_args+=(--force-zero)" "SnapRAID sync supports reviewed zero-byte transitions"
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-scrub.sh)" "/run/lock/snapraid-operation.lock" "SnapRAID scrub uses the shared operation lock"
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-scrub.sh)" "latest SnapRAID sync result" "SnapRAID scrub defers after a failed sync"
