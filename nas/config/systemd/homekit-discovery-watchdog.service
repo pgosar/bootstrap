@@ -1,0 +1,7 @@
+[Unit]
+Description=Watch HomeKit bridge discovery (mDNS answers)
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/homekit-discovery-watchdog
