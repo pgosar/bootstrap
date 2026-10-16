@@ -51,6 +51,10 @@ configure_operations_basics() {
   copy_with_backup "$NAS_ROOT/config/igmp-querier.py" "$(target_path /usr/local/sbin/igmp-querier.py)"
   run chmod 0755 "$(target_path /usr/local/sbin/igmp-querier.py)"
   copy_with_backup "$NAS_ROOT/config/systemd/igmp-querier.service" "$(target_path /etc/systemd/system/igmp-querier.service)"
+  copy_with_backup "$NAS_ROOT/config/homekit-discovery-watchdog" "$(target_path /usr/local/sbin/homekit-discovery-watchdog)"
+  run chmod 0755 "$(target_path /usr/local/sbin/homekit-discovery-watchdog)"
+  copy_with_backup "$NAS_ROOT/config/systemd/homekit-discovery-watchdog.service" "$(target_path /etc/systemd/system/homekit-discovery-watchdog.service)"
+  copy_with_backup "$NAS_ROOT/config/systemd/homekit-discovery-watchdog.timer" "$(target_path /etc/systemd/system/homekit-discovery-watchdog.timer)"
   copy_with_backup "$NAS_ROOT/../common/workstation-state/workstation-state-recorder" "$(target_path /usr/local/bin/workstation-state-recorder)"
   run chmod 0755 "$(target_path /usr/local/bin/workstation-state-recorder)"
   copy_with_backup "$NAS_ROOT/../common/workstation-state/state-diff" "$(target_path /usr/local/bin/state-diff)"
@@ -498,6 +502,7 @@ enable_services() {
   target_run systemctl enable nas-kernel-maintenance-reminder.timer
   target_run systemctl enable nas-weekly-digest.timer
   target_run systemctl enable igmp-querier.service
+  target_run systemctl enable homekit-discovery-watchdog.timer
   target_run systemctl enable workstation-state-recorder.timer
   target_run systemctl enable nas-recent-files.timer
   target_run systemctl enable nas-duplicate-report.timer

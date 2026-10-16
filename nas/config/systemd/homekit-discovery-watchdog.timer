@@ -1,0 +1,11 @@
+[Unit]
+Description=Check HomeKit bridge discovery every 5 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Unit=homekit-discovery-watchdog.service
+
+[Install]
+WantedBy=timers.target

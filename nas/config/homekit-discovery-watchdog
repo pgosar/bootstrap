@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""HomeKit discovery watchdog.
+
+Sends a real mDNS query for the HomeKit bridge and checks that Home
+Assistant answers. If nobody answers, discovery is dead even if every
+service looks healthy, so the homeassistant container is restarted
+(which rebuilds its discovery responder). At most one heal per
+30 minutes. Set HOMEKIT_WATCHDOG_DRYRUN=1 to log without restarting.
+"""
+
+import os
+import socket
+import struct
+import subprocess
+import sys
+import time
+
+GROUP = "224.0.0.251"
+PORT = 5353
+LAN_IP = "192.168.1.218"
+SERVICE = "_hap._tcp.local"
+EXPECT = b"HASS Bridge"
+STATE = "/var/lib/homekit-watchdog/last-heal"
+COOLDOWN = 1800
+
+
+def build_query():
+    packet = struct.pack("!HHHHHH", 0, 0, 1, 0, 0, 0)
+    for part in SERVICE.split("."):
+        if part:
+            packet += bytes([len(part)]) + part.encode()
+    return packet + b"\x00" + struct.pack("!HH", 12, 1)
+
+
+def bridge_answers():
+    try:
+        return _bridge_answers()
+    except OSError as err:
+        print(f"homekit-discovery-watchdog: probe error: {err}", flush=True)
+        return False
+
+
+def _bridge_answers():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind(("", PORT))
+    mreq = socket.inet_aton(GROUP) + socket.inet_aton(LAN_IP)
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+    sock.settimeout(3)
+    try:
+        for _attempt in range(2):
+            sock.sendto(build_query(), (GROUP, PORT))
+            try:
+                while True:
+                    data, _addr = sock.recvfrom(4096)
+                    if EXPECT in data:
+                        return True
+            except socket.timeout:
+                continue
+        return False
+    finally:
+        sock.close()
+
+
+def main():
+    if bridge_answers():
+        return 0
+    print("homekit-discovery-watchdog: bridge did not answer an mDNS query", flush=True)
+    last = 0
+    try:
+        last = int(open(STATE).read().strip())
+    except (OSError, ValueError):
+        pass
+    if time.time() - last < COOLDOWN:
+        print("homekit-discovery-watchdog: already healed <30m ago; leaving it alone", flush=True)
+        return 0
+    if os.environ.get("HOMEKIT_WATCHDOG_DRYRUN"):
+        print("homekit-discovery-watchdog: dry run; would restart homeassistant now", flush=True)
+        return 0
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)
+    with open(STATE, "w") as fh:
+        fh.write(str(int(time.time())))
+    subprocess.run(["docker", "restart", "homeassistant"], timeout=120, check=False)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
