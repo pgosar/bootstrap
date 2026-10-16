@@ -947,6 +947,7 @@ check_enabled_runtime_units() {
     logrotate.timer
     nas-kernel-maintenance-reminder.timer
     nas-weekly-digest.timer
+    igmp-querier.service
     workstation-state-recorder.timer
     nas-recent-files.timer
     nas-duplicate-report.timer
@@ -1114,6 +1115,10 @@ check_common_services() {
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-weekly-digest)" "docker logs" "weekly digest scans Docker logs"
   check_file_contains_literal "$(target_path /usr/local/sbin/nas-weekly-digest)" "CRITICAL NAS ALERTS" "weekly digest emphasizes critical alerts"
   check_unit_enabled nas-weekly-digest.timer true
+  check_path_exists "$(target_path /usr/local/sbin/igmp-querier.py)"
+  check_path_exists "$(target_path /etc/systemd/system/igmp-querier.service)"
+  check_file_contains_literal "$(target_path /usr/local/sbin/igmp-querier.py)" "224.0.0.1" "igmp querier sends general queries to all hosts"
+  check_unit_enabled igmp-querier.service true
   check_path_exists "$(target_path /usr/local/bin/workstation-state-recorder)"
   check_path_exists "$(target_path /usr/local/bin/state-diff)"
   check_path_exists "$(target_path /usr/local/bin/workstation-state-prune)"

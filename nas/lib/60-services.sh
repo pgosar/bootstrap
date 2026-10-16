@@ -48,6 +48,9 @@ configure_operations_basics() {
   run chmod 0755 "$(target_path /usr/local/sbin/nas-weekly-digest)"
   copy_with_backup "$NAS_ROOT/config/systemd/nas-weekly-digest.service" "$(target_path /etc/systemd/system/nas-weekly-digest.service)"
   copy_with_backup "$NAS_ROOT/config/systemd/nas-weekly-digest.timer" "$(target_path /etc/systemd/system/nas-weekly-digest.timer)"
+  copy_with_backup "$NAS_ROOT/config/igmp-querier.py" "$(target_path /usr/local/sbin/igmp-querier.py)"
+  run chmod 0755 "$(target_path /usr/local/sbin/igmp-querier.py)"
+  copy_with_backup "$NAS_ROOT/config/systemd/igmp-querier.service" "$(target_path /etc/systemd/system/igmp-querier.service)"
   copy_with_backup "$NAS_ROOT/../common/workstation-state/workstation-state-recorder" "$(target_path /usr/local/bin/workstation-state-recorder)"
   run chmod 0755 "$(target_path /usr/local/bin/workstation-state-recorder)"
   copy_with_backup "$NAS_ROOT/../common/workstation-state/state-diff" "$(target_path /usr/local/bin/state-diff)"
@@ -494,6 +497,7 @@ enable_services() {
   target_run systemctl enable systemd-timesyncd.service
   target_run systemctl enable nas-kernel-maintenance-reminder.timer
   target_run systemctl enable nas-weekly-digest.timer
+  target_run systemctl enable igmp-querier.service
   target_run systemctl enable workstation-state-recorder.timer
   target_run systemctl enable nas-recent-files.timer
   target_run systemctl enable nas-duplicate-report.timer
