@@ -223,6 +223,7 @@ table inet filter {
     tcp dport 3004 ip saddr 172.16.0.0/12 accept
     tcp dport { 139, 445 } ip saddr @lan_cidrs accept
     udp dport { 137, 138 } ip saddr @lan_cidrs accept
+    udp dport 5353 ip saddr @lan_cidrs accept
     tcp dport @docker_ports ip saddr @lan_cidrs accept
     tcp dport @docker_ports ip saddr 172.16.0.0/12 accept
   }

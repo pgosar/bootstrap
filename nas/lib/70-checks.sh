@@ -1021,6 +1021,8 @@ check_common_services() {
     for firewall_cidr in $FIREWALL_LAN_CIDRS; do
       check_file_contains_literal "$(target_path /etc/nftables.conf)" "$firewall_cidr" "nftables includes reviewed network $firewall_cidr"
     done
+    check_file_contains_literal "$(target_path /etc/nftables.conf)" "udp dport 5353" "nftables accepts mDNS for local discovery"
+    check_file_contains_literal "$(target_path /etc/nftables.conf)" "8123" "nftables opens the Home Assistant port"
     if check_run_target nft -c -f /etc/nftables.conf >/dev/null 2>&1; then
       check_pass "nftables config validates"
     else
