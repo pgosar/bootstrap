@@ -451,6 +451,7 @@ check_managed_config_artifacts() {
     "profile.d/nas-kernel-reminder.sh|/etc/profile.d/nas-kernel-reminder.sh|644" \
     "zsh/zshrc|/etc/zsh/zshrc|644" \
     "sysctl/99-ipv4-only.conf|/etc/sysctl.d/99-ipv4-only.conf|644" \
+    "sysctl/99-swappiness.conf|/etc/sysctl.d/99-swappiness.conf|644" \
     "network/nas-ipv4-ethernet.nmconnection|/etc/NetworkManager/system-connections/nas-ipv4-ethernet.nmconnection|600" \
     "ssh/99-ipv4-only.conf|/etc/ssh/sshd_config.d/99-ipv4-only.conf|644"; do
     IFS='|' read -r source_relative installed_relative mode <<<"$mapping"
@@ -490,6 +491,7 @@ check_common_identity_and_base_os() {
     timezone_target="$(timedatectl show -p Timezone --value 2>/dev/null || true)"
     [[ "$timezone_target" == "$TIMEZONE" ]] && check_pass "runtime timezone is $TIMEZONE" || check_fail "runtime timezone is $TIMEZONE"
     [[ "$(sysctl -n net.ipv6.conf.all.disable_ipv6 2>/dev/null || true)" == "1" ]] && check_pass "IPv6 is disabled at runtime" || check_fail "IPv6 is disabled at runtime"
+    [[ "$(sysctl -n vm.swappiness 2>/dev/null || true)" == "10" ]] && check_pass "vm.swappiness is 10 at runtime" || check_fail "vm.swappiness is 10 at runtime"
     if nmcli -g NAME connection show 2>/dev/null | grep -Fxq "NAS IPv4 Ethernet"; then
       check_pass "NAS IPv4 Ethernet profile is loaded"
     else

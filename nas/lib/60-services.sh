@@ -32,6 +32,7 @@ configure_operations_basics() {
   copy_with_backup "$NAS_ROOT/config/systemd/nas-kernel-maintenance-reminder.timer" "$(target_path /etc/systemd/system/nas-kernel-maintenance-reminder.timer)"
   copy_with_backup "$NAS_ROOT/config/zsh/zshrc" "$(target_path /etc/zsh/zshrc)"
   copy_with_backup "$NAS_ROOT/config/sysctl/99-ipv4-only.conf" "$(target_path /etc/sysctl.d/99-ipv4-only.conf)"
+  copy_with_backup "$NAS_ROOT/config/sysctl/99-swappiness.conf" "$(target_path /etc/sysctl.d/99-swappiness.conf)"
   copy_with_backup "$NAS_ROOT/config/network/nas-ipv4-ethernet.nmconnection" "$(target_path /etc/NetworkManager/system-connections/nas-ipv4-ethernet.nmconnection)"
   run chmod 0600 "$(target_path /etc/NetworkManager/system-connections/nas-ipv4-ethernet.nmconnection)"
   if [[ "$APPLY" == true && "$TARGET_MODE" == "host" ]]; then
