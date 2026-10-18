@@ -387,7 +387,7 @@ configure_docker() {
 "# Compose files should avoid broad 0.0.0.0 bindings unless intentionally reviewed."$'\n'\
 "# Prefer LAN-only, Tailscale-only, or localhost bindings for admin UIs."$'\n'\
 "# TODO: add a small /data/docker/compose exposure audit before real Compose stacks."$'\n'\
-"[Unit]"$'\n'"RequiresMountsFor=$MERGERFS_MOUNT"$'\n'"After=network-online.target"$'\n'"Wants=network-online.target"$'\n'
+"[Unit]"$'\n'"RequiresMountsFor=$MERGERFS_MOUNT /mnt/disk1 /mnt/disk2 /mnt/disk3"$'\n'"After=network-online.target"$'\n'"Wants=network-online.target"$'\n'
   copy_with_backup "$NAS_ROOT/config/docker-daemon.json.example" "$(target_path /etc/docker/daemon.json)"
 }
 

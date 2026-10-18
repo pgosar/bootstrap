@@ -711,7 +711,7 @@ check_common_docker() {
   docker_override="$(target_path /etc/systemd/system/docker.service.d/wait-for-data.conf)"
   docker_daemon_config="$(target_path /etc/docker/daemon.json)"
   check_path_exists "$docker_override"
-  check_file_contains_literal "$docker_override" "RequiresMountsFor=$MERGERFS_MOUNT" "Docker waits for $MERGERFS_MOUNT"
+  check_file_contains_literal "$docker_override" "RequiresMountsFor=$MERGERFS_MOUNT /mnt/disk1 /mnt/disk2 /mnt/disk3" "Docker waits for $MERGERFS_MOUNT"
   check_file_contains_literal "$docker_override" "After=network-online.target" "Docker waits for network-online target"
   check_file_contains_literal "$docker_override" "Docker published ports are explicit exposure" "Docker exposure stance documented"
   check_path_exists "$docker_daemon_config"
@@ -741,7 +741,7 @@ check_common_docker() {
   fi
   check_unit_enabled docker true
   if [[ "$TARGET_MODE" == "host" ]]; then
-    if systemctl cat docker 2>/dev/null | grep -F "RequiresMountsFor=$MERGERFS_MOUNT" >/dev/null; then
+    if systemctl cat docker 2>/dev/null | grep -F "RequiresMountsFor=$MERGERFS_MOUNT /mnt/disk1 /mnt/disk2 /mnt/disk3" >/dev/null; then
       check_pass "systemctl cat docker includes mount dependency"
     else
       check_fail "systemctl cat docker includes mount dependency"
