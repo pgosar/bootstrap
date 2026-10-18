@@ -27,6 +27,20 @@ status="${PIPESTATUS[0]}"
 
 if (( status != 0 )); then
   summary="$(tail -n 12 "$output_file")"
+  # SnapRAID exits non-zero for every error class, including soft errors:
+  # files that changed since the last sync, which are expected in the gap
+  # between the daily sync and this weekly scrub. Only data errors (failed
+  # integrity checks) and io errors (disk read failures) are real failures.
+  # If the summary counts cannot be parsed, fall through to failure.
+  soft_errors="$(grep -oE '[0-9]+ soft errors' "$output_file" | tail -n 1 | grep -oE '^[0-9]+')"
+  io_errors="$(grep -oE '[0-9]+ io errors' "$output_file" | tail -n 1 | grep -oE '^[0-9]+')"
+  data_errors="$(grep -oE '[0-9]+ data errors' "$output_file" | tail -n 1 | grep -oE '^[0-9]+')"
+  if [[ -n "$soft_errors" && -n "$io_errors" && -n "$data_errors" ]] \
+    && (( io_errors == 0 && data_errors == 0 )); then
+    /usr/local/sbin/nas-notify snapraid-scrub \
+      "Weekly 12% scrub completed with warnings: $soft_errors soft errors (files changed since the last sync); no data or io errors."$'\n'"$summary" || true
+    exit 0
+  fi
   /usr/local/sbin/nas-notify snapraid-scrub \
     "Weekly 12% scrub failed with exit status $status."$'\n'"$summary" || true
 fi
