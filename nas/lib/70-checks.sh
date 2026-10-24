@@ -855,6 +855,7 @@ check_common_snapraid_btrbk_samba() {
     check_unit_enabled snapraid-scrub.timer true
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-sync.sh)" "/run/lock/snapraid-operation.lock" "SnapRAID sync uses the shared operation lock"
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-sync.sh)" "^backups/(docker-state/[^/]+|nvme-db)/current/" "SnapRAID sync scopes automatic zero-byte handling to Docker-state replicas"
+    check_file_contains_literal "$(target_path /usr/local/bin/snapraid-sync.sh)" "personal/katrina/chat-history" "SnapRAID sync exempts Katrina export churn from the deletion guard"
     # The allowlist only works if it matches the live replica layout:
     # docker-state replicas sit under a per-disk directory, nvme-db
     # replicas do not. Test the installed pattern against sample paths
