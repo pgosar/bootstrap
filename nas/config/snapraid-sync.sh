@@ -58,9 +58,15 @@ fi
 # Matches both docker-state (with disk name) and nvme-db (without disk name) replica churn.
 docker_state_removed_count="$(printf '%s\n' "$diff_out" |
     awk '/^remove[[:space:]]+backups\/docker-state\/[^/]+\/current\// || /^remove[[:space:]]+backups\/nvme-db\/current\// {count++} END {print count + 0}')"
-guard_removed_count=$((removed_count - docker_state_removed_count))
 
-echo "Files to be removed: $removed_count ($docker_state_removed_count expected Docker-state replica churn; $guard_removed_count subject to safety threshold)"
+# Full Katrina iMessage re-exports regenerate asset filenames, so that tree's
+# removals are expected churn. The export is reproducible from the MacBook and
+# snapshots cover accidents there; keep the guard for everything else.
+katrina_removed_count="$(printf '%s\n' "$diff_out" |
+    awk '/^remove[[:space:]]+personal\/katrina\/chat-history\// {count++} END {print count + 0}')"
+guard_removed_count=$((removed_count - docker_state_removed_count - katrina_removed_count))
+
+echo "Files to be removed: $removed_count ($docker_state_removed_count expected Docker-state replica churn, $katrina_removed_count expected Katrina export churn; $guard_removed_count subject to safety threshold)"
 
 if [[ "$guard_removed_count" -gt "$THRESHOLD" ]]; then
     if [[ "$FORCE" == "true" ]]; then
