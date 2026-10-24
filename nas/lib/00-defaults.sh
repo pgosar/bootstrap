@@ -34,6 +34,7 @@ PACMAN_PACKAGES=(
   fzf
   kitty-terminfo
   fd
+  yazi
   the_silver_searcher
   gdu
   samba
