@@ -61,3 +61,14 @@
    valid users = @nas
    create mask = 0660
    directory mask = 0770
+
+[timemachine]
+   path = /data/backups/time-machine
+   browseable = yes
+   read only = no
+   valid users = @nas
+   create mask = 0660
+   directory mask = 0770
+   vfs objects = catia fruit streams_xattr
+   fruit:time machine = yes
+   fruit:time machine max size = 2199023255552
