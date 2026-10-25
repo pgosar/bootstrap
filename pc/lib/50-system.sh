@@ -10,7 +10,22 @@ configure_users() {
     for group in "${groups[@]}"; do
       target_run groupadd -f "$group"
     done
-    target_run groupadd -f "$PC_USER"
+    # The live machine's user group is GID 1000; a group created during
+    # package install can claim it first, so move any other holder aside.
+    local holder holder_gid
+    holder="$(target_run getent group 1000 2>/dev/null | cut -d: -f1 || true)"
+    if [[ -n "$holder" && "$holder" != "$PC_USER" ]]; then
+      holder_gid=1001
+      while target_run getent group "$holder_gid" >/dev/null 2>&1; do
+        holder_gid=$((holder_gid + 1))
+      done
+      target_run groupmod -g "$holder_gid" "$holder"
+    fi
+    if target_run getent group "$PC_USER" >/dev/null 2>&1; then
+      target_run groupmod -g 1000 "$PC_USER"
+    else
+      target_run groupadd -g 1000 "$PC_USER"
+    fi
     target_run useradd -m -s /bin/zsh -g "$PC_USER" -G "$joined_groups" "$PC_USER" 2>/dev/null || \
       target_run usermod -s /bin/zsh -G "$joined_groups" "$PC_USER"
     sudoers_file="$(target_path /etc/sudoers.d/10-wheel-nopasswd)"
