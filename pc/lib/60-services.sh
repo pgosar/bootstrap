@@ -44,8 +44,7 @@ configure_pc_service_files() {
   fi
   target_run install -d -o "$PC_USER" -g "$PC_USER" "/home/$PC_USER/.local/bin" "/home/$PC_USER/.config/systemd/user"
   run install -Dm 0755 "$PC_ROOT/config/wol/pc-blank-displays" "$(target_path /home/$PC_USER/.local/bin/pc-blank-displays)"
-  run install -Dm 0644 "$PC_ROOT/config/wol/pc-blank-displays.service" "$(target_path /home/$PC_USER/.config/systemd/user/pc-blank-displays.service)"
-  target_run chown "$PC_USER:$PC_USER" "/home/$PC_USER/.local/bin/pc-blank-displays" "/home/$PC_USER/.config/systemd/user/pc-blank-displays.service"
+  target_run chown "$PC_USER:$PC_USER" "/home/$PC_USER/.local/bin/pc-blank-displays"
   # ssh-inhibit: keep the machine awake while SSH sessions are active
   run install -Dm 0755 "$PC_ROOT/config/ssh-inhibit/ssh-inhibit.sh" "$(target_path /usr/local/bin/ssh-inhibit.sh)"
   run install -Dm 0644 "$PC_ROOT/config/ssh-inhibit/ssh-inhibit.service" "$(target_path /etc/systemd/system/ssh-inhibit.service)"
