@@ -77,9 +77,10 @@ The PC bootstrap mirrors the current host shape:
   suspend/resume hooks on, snapper-timeline and systemd-oomd off
 * the Docker workers stack under `~/docker` (the Tdarr node and the Immich
   machine-learning worker). The compose files are tracked; the two env
-  files are installed as placeholders; `pc-workers-up.service` creates
-  the containers at boot and keeps retrying every few minutes until the
-  NAS mounts and the filled-in `TDARR_API_KEY` are in place
+  files are installed as placeholders. There is no boot-time unit: like
+  the live machine, the workers are started on demand through the
+  dotfiles `pc-worker-ensure` / `tdarr-wake-monitor` tools once the real
+  `TDARR_API_KEY` is filled in
 
 With `SETUP_DOTFILES=true` (the default) the services phase also clones
 `pgosar/dotfiles` into `~/code/dotfiles` and runs its `install.sh`, so a
