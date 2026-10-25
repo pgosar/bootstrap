@@ -46,11 +46,13 @@ install_cachyos_keyring_host() {
   # The cachyos-repo bundle tarball is gone from the mirror; do what
   # upstream's cachyos-repo.sh does now: trust the key, then install the
   # keyring/mirrorlist packages from the repo (names resolved from its
-  # index, versions unpinned).
-  run pacman-key --recv-keys "$CACHYOS_KEY_FPR" --keyserver keyserver.ubuntu.com
-  run pacman-key --lsign-key "$CACHYOS_KEY_FPR"
+  # index, versions unpinned). Fetch the key over HTTPS instead of a
+  # keyserver lookup: dirmngr fetches hang behind the QEMU NAT.
   local staging="$STAGING_DIR/cachyos-repo"
   run mkdir -p "$staging"
+  run curl -fsSL -o "$staging/cachyos-key.asc" "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x$CACHYOS_KEY_FPR"
+  run pacman-key --add "$staging/cachyos-key.asc"
+  run pacman-key --lsign-key "$CACHYOS_KEY_FPR"
   local repo_url="https://mirror.cachyos.org/repo/x86_64/cachyos"
   run curl -fsSL -o "$staging/repo-index.html" "$repo_url/"
   local name
