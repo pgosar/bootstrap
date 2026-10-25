@@ -405,6 +405,11 @@ check_expected_services_enabled() {
   else
     check_pass "pc-workers-up.service absent (workers run on demand)"
   fi
+  if grep -qE "^${PC_USER}:x:[0-9]+:1000:" "$(target_path /etc/passwd)"; then
+    check_pass "user $PC_USER has primary GID 1000"
+  else
+    check_fail "user $PC_USER has primary GID 1000"
+  fi
   [[ "$ENABLE_BPFTUNE" == "true" ]] && check_unit_enabled bpftune
   [[ "$ENABLE_NVIDIA_SUSPEND_HOOKS" == "true" ]] && check_unit_enabled nvidia-suspend
   [[ "$ENABLE_NVIDIA_SUSPEND_HOOKS" == "true" ]] && check_unit_enabled nvidia-resume
