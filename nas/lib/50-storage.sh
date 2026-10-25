@@ -50,7 +50,7 @@ configure_data_disk() {
     if [[ -d "$active_mountpoint/pool/$subvol" ]]; then
       run chown "$PUID:$PGID" "$active_mountpoint/pool/$subvol"
       if [[ "$subvol" == .secrets-encrypted ]]; then
-        run chmod 0700 "$active_mountpoint/pool/$subvol"
+        run chmod 2700 "$active_mountpoint/pool/$subvol"
       else
         run chmod 2775 "$active_mountpoint/pool/$subvol"
       fi
@@ -59,7 +59,7 @@ configure_data_disk() {
     run btrfs subvolume create "$active_mountpoint/pool/$subvol"
     run chown "$PUID:$PGID" "$active_mountpoint/pool/$subvol"
     if [[ "$subvol" == .secrets-encrypted ]]; then
-      run chmod 0700 "$active_mountpoint/pool/$subvol"
+      run chmod 2700 "$active_mountpoint/pool/$subvol"
     else
       run chmod 2775 "$active_mountpoint/pool/$subvol"
     fi
