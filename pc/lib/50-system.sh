@@ -128,9 +128,9 @@ configure_pc_system_files() {
   [[ "$SYSTEM" == true || "$SERVICES" == true || "$ENABLE_SERVICES" == true ]] || return 0
   require_root
   if [[ "$APPLY" == true ]]; then
-    target_run install -Dm 0644 "$PC_ROOT/config/system/nvidia-suspend-workaround.conf" /etc/modprobe.d/nvidia-suspend-workaround.conf
-    target_run install -Dm 0644 "$PC_ROOT/config/system/92-keychron-via.rules" /etc/udev/rules.d/92-keychron-via.rules
-    target_run install -Dm 0755 "$PC_ROOT/config/system/remove-nvidia" /usr/local/bin/remove-nvidia
+    run install -Dm 0644 "$PC_ROOT/config/system/nvidia-suspend-workaround.conf" "$(target_path /etc/modprobe.d/nvidia-suspend-workaround.conf)"
+    run install -Dm 0644 "$PC_ROOT/config/system/92-keychron-via.rules" "$(target_path /etc/udev/rules.d/92-keychron-via.rules)"
+    run install -Dm 0755 "$PC_ROOT/config/system/remove-nvidia" "$(target_path /usr/local/bin/remove-nvidia)"
   else
     log "+ install PC system files (nvidia modprobe workaround, keychron udev rule, remove-nvidia)"
   fi
@@ -140,7 +140,7 @@ configure_network_profile() {
   [[ "$SYSTEM" == true || "$SERVICES" == true || "$ENABLE_SERVICES" == true ]] || return 0
   require_root
   if [[ "$APPLY" == true ]]; then
-    target_run install -Dm 0600 "$PC_ROOT/config/network/Wired connection 1.nmconnection" "/etc/NetworkManager/system-connections/Wired connection 1.nmconnection"
+    run install -Dm 0600 "$PC_ROOT/config/network/Wired connection 1.nmconnection" "$(target_path /etc/NetworkManager/system-connections/Wired connection 1.nmconnection)"
   else
     log "+ install NetworkManager wired profile (static $PC_STATIC_ADDRESS via $PC_GATEWAY)"
   fi
