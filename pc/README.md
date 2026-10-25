@@ -69,6 +69,16 @@ The PC bootstrap mirrors the current host shape:
   the RAM RGB clock schedule, the NVIDIA suspend workaround, the Keychron
   udev rule, the static-IP NetworkManager profile, and the NAS CIFS mounts
   (credentials come from `NAS_CREDS_SOURCE`, never from the repo)
+* the live host's `/etc` configuration: the Docker daemon's NVIDIA runtime,
+  the LACT GPU tuning, the plasmalogin autologin, the keyd keyboard configs,
+  the sysctl network tuning, and the saved WiFi profile (installed with a
+  placeholder psk; the real one is set on the machine, never in the repo)
+* service enablement matching the live host exactly: bpftune and the NVIDIA
+  suspend/resume hooks on, snapper-timeline and systemd-oomd off
+* the Docker workers stack under `~/docker` (the Tdarr node and the Immich
+  machine-learning worker). The compose files are tracked; the two env
+  files are installed as placeholders, and once `TDARR_API_KEY` is set in
+  them, `pc-workers-up.service` creates the containers on first boot
 
 With `SETUP_DOTFILES=true` (the default) the services phase also clones
 `pgosar/dotfiles` into `~/code/dotfiles` and runs its `install.sh`, so a
