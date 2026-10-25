@@ -699,7 +699,7 @@ check_common_grub_snapper() {
     else
       check_fail "snapper root config can be listed"
     fi
-    if check_run_target snapper --no-dbus -c "$SNAPPER_CONFIG_NAME" list 2>/dev/null | grep -Fq "$SNAPPER_INITIAL_SNAPSHOT_DESCRIPTION"; then
+    if check_run_target snapper --no-dbus -c "$SNAPPER_CONFIG_NAME" list 2>/dev/null | grep -Fq "$SNAPPER_INITIAL_SNAPSHOT_DESCRIPTION" || check_run_target snapper -c "$SNAPPER_CONFIG_NAME" list 2>/dev/null | grep -Fq "$SNAPPER_INITIAL_SNAPSHOT_DESCRIPTION"; then
       check_pass "initial Snapper snapshot exists"
     else
       check_fail "initial Snapper snapshot exists"
