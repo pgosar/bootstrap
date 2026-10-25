@@ -10,7 +10,7 @@ ISO_PATH="$1"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PC_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 REPO_ROOT="$(cd -- "$PC_ROOT/.." && pwd)"
-WORKDIR="$PC_ROOT/qemu/work"
+WORKDIR="${PC_QEMU_WORKDIR:-$PC_ROOT/qemu/work}"
 LOGDIR="$WORKDIR/logs"
 HTTPDIR="$WORKDIR/http"
 AUTOBoot_DIR="$WORKDIR/autoboot-iso"
@@ -42,8 +42,11 @@ cp "$PC_ROOT/qemu/guest/stage1.sh" "$HTTPDIR/pc-stage1.sh"
 
 if [[ -c /dev/kvm ]]; then
   KVM_ARGS=(-enable-kvm)
+  # The CachyOS znver4 packages need the host CPU's instruction set.
+  CPU_ARGS=(-cpu host)
 else
   KVM_ARGS=()
+  CPU_ARGS=()
 fi
 
 cat >"$WORKDIR/grub-auto.cfg" <<EOF
@@ -72,6 +75,7 @@ trap cleanup EXIT
 
 base_qemu_args=(
   "${KVM_ARGS[@]}"
+  "${CPU_ARGS[@]}"
   -m 4096
   -smp 4
   -drive "if=pflash,format=raw,readonly=on,file=$OVMF_CODE"
