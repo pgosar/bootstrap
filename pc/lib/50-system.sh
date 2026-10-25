@@ -140,7 +140,7 @@ configure_network_profile() {
   [[ "$SYSTEM" == true || "$SERVICES" == true || "$ENABLE_SERVICES" == true ]] || return 0
   require_root
   if [[ "$APPLY" == true ]]; then
-    run install -Dm 0600 "$PC_ROOT/config/network/Wired connection 1.nmconnection" "$(target_path /etc/NetworkManager/system-connections/Wired connection 1.nmconnection)"
+    run install -Dm 0600 "$PC_ROOT/config/network/Wired connection 1.nmconnection" "$(target_path "/etc/NetworkManager/system-connections/Wired connection 1.nmconnection")"
   else
     log "+ install NetworkManager wired profile (static $PC_STATIC_ADDRESS via $PC_GATEWAY)"
   fi
