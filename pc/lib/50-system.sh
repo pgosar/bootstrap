@@ -145,6 +145,8 @@ configure_pc_system_files() {
     target_run systemd-hwdb update
     run install -Dm 0644 "$PC_ROOT/config/system/logrotate.service" "$(target_path /etc/systemd/system/logrotate.service)"
     run install -Dm 0644 "$PC_ROOT/config/system/logrotate.timer" "$(target_path /etc/systemd/system/logrotate.timer)"
+    run ln -sf /opt/mcpelauncher-bin/bin/mcpelauncher-client "$(target_path /usr/local/bin/mcpelauncher-client)"
+    run ln -sf /opt/mcpelauncher-bin/bin/mcpelauncher-ui-qt "$(target_path /usr/local/bin/mcpelauncher-ui-qt)"
   else
     log "+ install PC system files (nvidia workaround, keychron rule, remove-nvidia, docker/lact/plasmalogin configs, keyd, sysctl, sleep mode, mkinitcpio drop-ins, hwdb, logrotate, mcpelauncher links)"
   fi
