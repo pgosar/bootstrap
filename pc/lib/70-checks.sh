@@ -369,7 +369,11 @@ check_expected_services_enabled() {
   [[ "$ENABLE_RAM_RGB" == "true" ]] && check_unit_enabled ram-rgb-on.timer
   [[ "$ENABLE_RAM_RGB" == "true" ]] && check_unit_enabled ram-rgb-off.timer
   [[ "$ENABLE_PC_WOL" == "true" ]] && check_unit_enabled pc-wol
-  [[ "$ENABLE_PC_WORKERS" == "true" ]] && check_unit_enabled pc-workers-up false
+  if [[ "$TARGET_MODE" == "live" || "$EXPECT_INSTALLED_MARKERS" == "true" ]]; then
+    [[ "$ENABLE_PC_WORKERS" == "true" ]] && check_unit_enabled pc-workers-up
+  else
+    [[ "$ENABLE_PC_WORKERS" == "true" ]] && check_unit_enabled pc-workers-up false
+  fi
   [[ "$ENABLE_BPFTUNE" == "true" ]] && check_unit_enabled bpftune
   [[ "$ENABLE_NVIDIA_SUSPEND_HOOKS" == "true" ]] && check_unit_enabled nvidia-suspend
   [[ "$ENABLE_NVIDIA_SUSPEND_HOOKS" == "true" ]] && check_unit_enabled nvidia-resume
@@ -415,6 +419,16 @@ check_pc_parity_files() {
   check_file_exists "$(target_path /etc/.nascreds)"
   check_file_contains "$(target_path /etc/docker/daemon.json)" "nvidia-container-runtime" "docker nvidia runtime configured"
   check_file_contains "$(target_path /etc/lact/config.yaml)" "power_cap: 550" "LACT GPU tuning present"
+  check_file_contains "$(target_path /etc/lact/config.yaml)" "0: 815" "LACT core clock offset present"
+  check_file_contains "$(target_path /etc/lact/config.yaml)" "0: 4400" "LACT memory clock offset present"
+  check_file_contains "$(target_path /etc/systemd/sleep.conf.d/10-suspend-mode.conf)" "MemorySleepMode=deep" "deep suspend mode present"
+  check_file_contains "$(target_path /etc/mkinitcpio.conf.d/10-chwd.conf)" "nvidia_modeset" "mkinitcpio NVIDIA modules drop-in present"
+  check_file_exists "$(target_path /etc/mkinitcpio.conf.d/10-chwd-kms.conf)"
+  check_file_exists "$(target_path /etc/udev/hwdb.d/90-8bitdo-retro-keyboard-modifiers.hwdb)"
+  check_file_exists "$(target_path /etc/systemd/system/logrotate.service)"
+  check_file_exists "$(target_path /etc/systemd/system/logrotate.timer)"
+  check_file_exists "$(target_path /usr/local/bin/mcpelauncher-client)"
+  check_file_exists "$(target_path /usr/local/bin/mcpelauncher-ui-qt)"
   check_file_exists "$(target_path /etc/keyd/8bitdo-retro-keyboard.conf)"
   check_file_exists "$(target_path /etc/keyd/by-tech-gaming-keyboard.conf)"
   check_file_contains "$(target_path /etc/sysctl.d/99-bbr.conf)" "tcp_congestion_control=bbr" "BBR sysctl present"
@@ -425,7 +439,9 @@ check_pc_parity_files() {
   check_file_exists "$(target_path "/home/$PC_USER/docker/pc-workers-compose.yml")"
   check_file_exists "$(target_path "/home/$PC_USER/docker/pc-workers.env")"
   check_file_exists "$(target_path "/home/$PC_USER/docker/pc-workers/.env")"
-  if [[ -e "$(target_path /etc/systemd/system/pc-workers-up.service)" ]]; then
+  if [[ "$TARGET_MODE" == "live" || "$EXPECT_INSTALLED_MARKERS" == "true" ]]; then
+    check_file_exists "$(target_path /etc/systemd/system/pc-workers-up.service)"
+  elif [[ -e "$(target_path /etc/systemd/system/pc-workers-up.service)" ]]; then
     check_pass "/etc/systemd/system/pc-workers-up.service exists"
   else
     check_warn "pc-workers-up.service not installed (pre-bootstrap host)"
