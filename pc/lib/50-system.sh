@@ -174,6 +174,9 @@ configure_pc_system_files() {
     run install -Dm 0644 "$PC_ROOT/config/system/lact-config.yaml" "$(target_path /etc/lact/config.yaml)"
     run install -Dm 0644 "$PC_ROOT/config/system/plasmalogin.conf" "$(target_path /etc/plasmalogin.conf)"
     run install -Dm 0644 "$PC_ROOT/config/system/fuse.conf" "$(target_path /etc/fuse.conf)"
+    if [[ -f "$(target_path /etc/default/grub-btrfs/config)" ]]; then
+      run sed -i 's|^#.*GRUB_BTRFS_SUBMENUNAME=.*|GRUB_BTRFS_SUBMENUNAME="Arch Linux snapshots"|' "$(target_path /etc/default/grub-btrfs/config)"
+    fi
     run rm -f "$(target_path /etc/os-release)" "$(target_path /etc/lsb-release)"
     run install -Dm 0644 "$PC_ROOT/config/system/os-release" "$(target_path /etc/os-release)"
     run install -Dm 0644 "$PC_ROOT/config/system/lsb-release" "$(target_path /etc/lsb-release)"

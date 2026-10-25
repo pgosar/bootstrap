@@ -487,6 +487,8 @@ check_pc_parity_files() {
   check_file_contains "$(target_path /etc/environment)" "EDITOR=nvim" "environment sets EDITOR to nvim"
   check_file_contains "$(target_path /etc/os-release)" "ID=arch" "os-release carries the live Arch branding"
   check_file_contains "$(target_path /etc/fstab)" "umask=0077" "ESP fstab entry uses umask=0077"
+  check_file_contains "$(target_path /etc/default/grub)" "GRUB_EARLY_INITRD_LINUX_STOCK" "grub defaults carry the live early-initrd line"
+  check_file_contains "$(target_path /etc/default/grub-btrfs/config)" "GRUB_BTRFS_SUBMENUNAME" "grub-btrfs submenu name matches live"
   check_file_exists "$(target_path /etc/pacman.d/hooks/cachyos-branding.hook)"
   check_file_exists "$(target_path /etc/pacman.d/hooks/cachyos-plymouth-initramfs.hook)"
   check_file_exists "$(target_path /etc/pacman.d/hooks/cachyos-reboot-required.hook)"
