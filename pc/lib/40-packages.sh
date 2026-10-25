@@ -92,9 +92,11 @@ configure_pacman_for_target() {
       # keyring + mirrorlist packages into the target.
       local host_bundle="$STAGING_DIR/cachyos-repo"
       [[ -d "$host_bundle" ]] || die "cachyos repo bundle missing: $host_bundle (pacstrap phase must run first in live mode)"
-      run mkdir -p "$(target_path /tmp/cachyos-repo)"
-      run find "$host_bundle" \( -name "cachyos-keyring-*.pkg.tar.zst" -o -name "cachyos-mirrorlist-*.pkg.tar.zst" -o -name "cachyos-*-mirrorlist-*.pkg.tar.zst" \) -exec cp -t "$(target_path /tmp/cachyos-repo/)" {} +
-      target_run bash -lc "pacman -U --noconfirm /tmp/cachyos-repo/*.pkg.tar.zst"
+      # Staged under /root: arch-chroot mounts a tmpfs over the target /tmp.
+      run mkdir -p "$(target_path /root/cachyos-repo)"
+      run find "$host_bundle" \( -name "cachyos-keyring-*.pkg.tar.zst" -o -name "cachyos-mirrorlist-*.pkg.tar.zst" -o -name "cachyos-*-mirrorlist-*.pkg.tar.zst" \) -exec cp -t "$(target_path /root/cachyos-repo/)" {} +
+      target_run bash -lc "pacman -U --noconfirm /root/cachyos-repo/*.pkg.tar.zst"
+      target_run rm -rf /root/cachyos-repo
     else
       install_cachyos_keyring_host
     fi
