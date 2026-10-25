@@ -131,8 +131,15 @@ configure_pc_system_files() {
     run install -Dm 0644 "$PC_ROOT/config/system/nvidia-suspend-workaround.conf" "$(target_path /etc/modprobe.d/nvidia-suspend-workaround.conf)"
     run install -Dm 0644 "$PC_ROOT/config/system/92-keychron-via.rules" "$(target_path /etc/udev/rules.d/92-keychron-via.rules)"
     run install -Dm 0755 "$PC_ROOT/config/system/remove-nvidia" "$(target_path /usr/local/bin/remove-nvidia)"
+    run install -Dm 0644 "$PC_ROOT/config/system/daemon.json" "$(target_path /etc/docker/daemon.json)"
+    run install -Dm 0644 "$PC_ROOT/config/system/lact-config.yaml" "$(target_path /etc/lact/config.yaml)"
+    run install -Dm 0644 "$PC_ROOT/config/system/plasmalogin.conf" "$(target_path /etc/plasmalogin.conf)"
+    run install -Dm 0644 "$PC_ROOT/config/keyd/8bitdo-retro-keyboard.conf" "$(target_path /etc/keyd/8bitdo-retro-keyboard.conf)"
+    run install -Dm 0644 "$PC_ROOT/config/keyd/by-tech-gaming-keyboard.conf" "$(target_path /etc/keyd/by-tech-gaming-keyboard.conf)"
+    run install -Dm 0644 "$PC_ROOT/config/sysctl/99-bbr.conf" "$(target_path /etc/sysctl.d/99-bbr.conf)"
+    run install -Dm 0644 "$PC_ROOT/config/sysctl/40-ipv6.conf" "$(target_path /etc/sysctl.d/40-ipv6.conf)"
   else
-    log "+ install PC system files (nvidia modprobe workaround, keychron udev rule, remove-nvidia)"
+    log "+ install PC system files (nvidia workaround, keychron rule, remove-nvidia, docker/lact/plasmalogin configs, keyd, sysctl)"
   fi
 }
 
@@ -141,6 +148,10 @@ configure_network_profile() {
   require_root
   if [[ "$APPLY" == true ]]; then
     run install -Dm 0600 "$PC_ROOT/config/network/Wired connection 1.nmconnection" "$(target_path "/etc/NetworkManager/system-connections/Wired connection 1.nmconnection")"
+    if [[ ! -f "$(target_path "/etc/NetworkManager/system-connections/ATTcFikS2f-5g.nmconnection")" ]]; then
+      run install -Dm 0600 "$PC_ROOT/config/network/ATTcFikS2f-5g.nmconnection" "$(target_path "/etc/NetworkManager/system-connections/ATTcFikS2f-5g.nmconnection")"
+      warn "WiFi profile installed with a placeholder psk: set the real psk in ATTcFikS2f-5g.nmconnection"
+    fi
   else
     log "+ install NetworkManager wired profile (static $PC_STATIC_ADDRESS via $PC_GATEWAY)"
   fi
