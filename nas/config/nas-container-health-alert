@@ -26,7 +26,7 @@ else
     health="${state_health#*|}"
     if [[ "$state" != "running" ]]; then
       printf '%s\t%s\n' "$name" "$state" >>"$tmp_bad"
-    elif [[ "$health" == "unhealthy" || "$health" == "none" ]]; then
+    elif [[ "$health" == "unhealthy" ]]; then
       printf '%s\t%s\n' "$name" "$health" >>"$tmp_bad"
     fi
   done < <(docker ps -a --format '{{.ID}}\t{{.Names}}')
