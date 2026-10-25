@@ -76,8 +76,8 @@ trap cleanup EXIT
 base_qemu_args=(
   "${KVM_ARGS[@]}"
   "${CPU_ARGS[@]}"
-  -m 4096
-  -smp 4
+  -m 8192
+  -smp 2
   -drive "if=pflash,format=raw,readonly=on,file=$OVMF_CODE"
   -drive "if=pflash,format=raw,file=$WORKDIR/OVMF_VARS.fd"
   -virtfs "local,path=$REPO_ROOT,mount_tag=repo,security_model=none,readonly=on"
