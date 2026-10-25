@@ -1,0 +1,24 @@
+[connection]
+id=Wired connection 1
+uuid=b76775ff-6e2d-329d-b23e-3d7ec3b2b6df
+type=ethernet
+autoconnect-priority=-100
+timestamp=1792875113
+
+[ethernet]
+mtu=9000
+wake-on-lan=64
+
+[ipv4]
+address1=192.168.1.50/24
+dns=1.1.1.1;8.8.8.8;
+gateway=192.168.1.254
+ignore-auto-dns=true
+may-fail=false
+method=manual
+
+[ipv6]
+addr-gen-mode=stable-privacy
+method=ignore
+
+[proxy]

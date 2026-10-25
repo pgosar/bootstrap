@@ -1,0 +1,2 @@
+# Keychron / QMK VIA access for Keychron Launcher and remap tools
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="3434", MODE="0666"
