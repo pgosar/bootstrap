@@ -14,6 +14,17 @@ set_pacman_conf_basics() {
     printf '\nParallelDownloads = 50\n' >>"$pacman_conf"
   fi
   sed -i '/^\#\[multilib\]/{s/^#//;n;s/^#//;}' "$pacman_conf"
+  # Mirror the live [options]: Spotify stays held at its pinned build,
+  # and the output options match what the live machine uses.
+  if grep -Eq '^[#[:space:]]*IgnorePkg[[:space:]]*=' "$pacman_conf"; then
+    sed -i 's/^[#[:space:]]*IgnorePkg[[:space:]]*=.*/IgnorePkg = spotify/' "$pacman_conf"
+  else
+    sed -i 's/^\[options\]/[options]\nIgnorePkg = spotify/' "$pacman_conf"
+  fi
+  local opt
+  for opt in Color ILoveCandy VerbosePkgLists DisableDownloadTimeout; do
+    grep -Eq "^$opt([[:space:]]|$)" "$pacman_conf" || sed -i "s/^\[options\]/[options]\n$opt/" "$pacman_conf"
+  done
 }
 
 cachyos_repo_sections() {

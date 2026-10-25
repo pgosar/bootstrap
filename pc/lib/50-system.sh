@@ -23,18 +23,29 @@ configure_users() {
 
 configure_host_identity() {
   [[ "$SYSTEM" == true || "$SERVICES" == true || "$ENABLE_SERVICES" == true ]] || return 0
-  local hosts_file grub_default mkinitcpio locale_gen locale_conf vconsole_conf resolv_conf
+  local hosts_file grub_default mkinitcpio locale_gen locale_conf vconsole_conf
   hosts_file="$(target_path /etc/hosts)"
   grub_default="$(target_path /etc/default/grub)"
   mkinitcpio="$(target_path /etc/mkinitcpio.conf)"
   locale_gen="$(target_path /etc/locale.gen)"
   locale_conf="$(target_path /etc/locale.conf)"
   vconsole_conf="$(target_path /etc/vconsole.conf)"
-  resolv_conf="$(target_path /etc/resolv.conf)"
 
   write_text "$(target_path /etc/hostname)" "$PC_HOSTNAME"
-  write_text "$locale_conf" "LANG=$LOCALE"
-  write_text "$vconsole_conf" "KEYMAP=$KEYMAP"
+  write_text "$locale_conf" "LANG=$LOCALE
+LC_ADDRESS=$LOCALE
+LC_IDENTIFICATION=$LOCALE
+LC_MEASUREMENT=$LOCALE
+LC_MONETARY=$LOCALE
+LC_NAME=$LOCALE
+LC_NUMERIC=$LOCALE
+LC_PAPER=$LOCALE
+LC_TELEPHONE=$LOCALE
+LC_TIME=$LOCALE"
+  write_text "$vconsole_conf" "# Written by systemd-localed(8) or systemd-firstboot(1), read by systemd-localed
+# and systemd-vconsole-setup(8). Use localectl(1) to update this file.
+KEYMAP=$KEYMAP
+XKBLAYOUT=$KEYMAP"
 
   if [[ "$APPLY" == true ]]; then
     if [[ -f "$locale_gen" ]]; then
@@ -42,14 +53,16 @@ configure_host_identity() {
       sed -i "s/^#\(${LOCALE//./\\.} UTF-8\)/\1/" "$locale_gen"
     fi
     cat >"$hosts_file" <<EOF
-127.0.0.1 localhost
-::1 localhost
-127.0.1.1 $PC_HOSTNAME.localdomain $PC_HOSTNAME
+# Standard host addresses
+127.0.0.1  localhost
+::1        localhost ip6-localhost ip6-loopback
+ff02::1    ip6-allnodes
+ff02::2    ip6-allrouters
+# This host address
+127.0.1.1  $PC_HOSTNAME
 EOF
-    if [[ "$ENABLE_SYSTEMD_RESOLVED" == true ]]; then
-      rm -f "$resolv_conf"
-      ln -s /run/systemd/resolve/stub-resolv.conf "$resolv_conf"
-    fi
+    # /etc/resolv.conf is left to NetworkManager, as on the live machine:
+    # it writes the resolved stub address into a regular file itself.
   else
     log "+ write hostname and hosts for $PC_HOSTNAME"
   fi
@@ -73,6 +86,9 @@ configure_snapper_root() {
     cat >"$config_file" <<'EOF'
 SUBVOLUME="/"
 FSTYPE="btrfs"
+QGROUP=""
+SPACE_LIMIT="0.5"
+FREE_LIMIT="0.2"
 ALLOW_USERS=""
 ALLOW_GROUPS=""
 SYNC_ACL="no"
