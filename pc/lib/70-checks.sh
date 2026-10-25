@@ -487,6 +487,22 @@ check_ufw_rules() {
   else
     check_fail "UFW allows KDE Connect UDP from $KDECONNECT_LAN_CIDR"
   fi
+  if grep -Fq "ufw allow 22" <<<"$added_rules"; then
+    check_pass "UFW allows SSH (22)"
+  else
+    check_fail "UFW allows SSH (22)"
+  fi
+  if grep -Fq "ufw allow from $KDECONNECT_LAN_CIDR to any port 47984,47989,47990,48010 proto tcp" <<<"$added_rules"; then
+    check_pass "UFW allows Sunshine TCP from the LAN"
+  else
+    check_fail "UFW allows Sunshine TCP from the LAN"
+  fi
+  if grep -Fq "ufw allow from $TAILSCALE_CIDR to any port 47998,47999,48000,48002,48010 proto udp" <<<"$added_rules"; then
+    check_pass "UFW allows Sunshine UDP from the Tailscale range"
+  else
+    check_fail "UFW allows Sunshine UDP from the Tailscale range"
+  fi
+  check_file_contains "$(target_path /etc/ufw/ufw.conf)" "ENABLED=yes" "UFW is set enabled in ufw.conf"
 }
 
 check_health_active_services() {

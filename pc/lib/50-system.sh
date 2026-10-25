@@ -106,8 +106,16 @@ configure_ufw_rules() {
   [[ "$ENABLE_UFW" == "true" ]] || return 0
   require_root
 
+  target_run ufw allow 22
   target_run ufw allow from "$KDECONNECT_LAN_CIDR" to any port 1714:1764 proto tcp comment "KDE Connect LAN"
   target_run ufw allow from "$KDECONNECT_LAN_CIDR" to any port 1714:1764 proto udp comment "KDE Connect LAN"
+  target_run ufw allow from "$KDECONNECT_LAN_CIDR" to any port 47984,47989,47990,48010 proto tcp comment "Sunshine LAN"
+  target_run ufw allow from "$KDECONNECT_LAN_CIDR" to any port 47998,47999,48000,48002,48010 proto udp comment "Sunshine LAN"
+  target_run ufw allow from "$TAILSCALE_CIDR" to any port 47984,47989,47990,48010 proto tcp comment "Sunshine Tailscale"
+  target_run ufw allow from "$TAILSCALE_CIDR" to any port 47998,47999,48000,48002,48010 proto udp comment "Sunshine Tailscale"
+  # ufw --force enable cannot run inside the install chroot; the
+  # ENABLED flag plus the enabled ufw.service load the rules at boot.
+  run sed -i 's/^ENABLED=.*/ENABLED=yes/' "$(target_path /etc/ufw/ufw.conf)"
 }
 
 setup_fnm() {
