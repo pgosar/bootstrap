@@ -1,14 +1,11 @@
 set_pacman_conf_basics() {
   # $1 = pacman.conf path (plain file edit): ParallelDownloads + multilib.
   local pacman_conf="$1"
-  # The stock commented Architecture line means x86_64 only; "auto" lets
-  # pacman detect the CPU's x86_64_v3/v4 levels, which the CachyOS znver4
-  # packages require (upstream's repo installer sets the same).
-  if grep -Eq '^[#[:space:]]*Architecture[[:space:]]*=' "$pacman_conf"; then
-    sed -i 's/^[#[:space:]]*Architecture[[:space:]]*=.*/Architecture = auto/' "$pacman_conf"
-  else
-    sed -i 's/^\[options\]/[options]\nArchitecture = auto/' "$pacman_conf"
-  fi
+  # Stock pacman only accepts x86_64 packages unless the v3/v4 levels are
+  # listed explicitly (auto-detection of the levels is a CachyOS-pacman
+  # feature); the CachyOS znver4 packages require x86_64_v4 here.
+  sed -i '/^[#[:space:]]*Architecture[[:space:]]*=/d' "$pacman_conf"
+  sed -i 's/^\[options\]/[options]\nArchitecture = x86_64 x86_64_v3 x86_64_v4/' "$pacman_conf"
   if grep -Eq '^[#[:space:]]*ParallelDownloads[[:space:]]*=' "$pacman_conf"; then
     sed -i 's/^[#[:space:]]*ParallelDownloads[[:space:]]*=.*/ParallelDownloads = 50/' "$pacman_conf"
   else
