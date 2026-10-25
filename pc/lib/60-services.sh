@@ -79,8 +79,8 @@ configure_docker_workers() {
     warn "wrote placeholder $home/docker/pc-workers/.env: set TDARR_API_KEY before the workers can pair"
   fi
   target_run chown "$PC_USER:$PC_USER" "$home/docker/pc-workers-compose.yml" "$home/docker/pc-workers/compose.yml" "$home/docker/pc-workers.env" "$home/docker/pc-workers/.env"
-  run install -Dm 0644 "$PC_ROOT/config/docker-workers/pc-workers-up.service" "$(target_path /etc/systemd/system/pc-workers-up.service)"
-  run sed -i -e "s/__PC_USER__/$PC_USER/g" "$(target_path /etc/systemd/system/pc-workers-up.service)"
+  # No boot-time unit: the live machine starts the workers on demand
+  # through the dotfiles pc-worker-ensure / tdarr-wake-monitor tools.
 }
 
 setup_dotfiles() {

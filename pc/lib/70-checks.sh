@@ -390,10 +390,12 @@ check_expected_services_enabled() {
   [[ "$ENABLE_RAM_RGB" == "true" ]] && check_unit_enabled ram-rgb-on.timer
   [[ "$ENABLE_RAM_RGB" == "true" ]] && check_unit_enabled ram-rgb-off.timer
   [[ "$ENABLE_PC_WOL" == "true" ]] && check_unit_enabled pc-wol
-  if [[ "$TARGET_MODE" == "live" || "$EXPECT_INSTALLED_MARKERS" == "true" ]]; then
-    [[ "$ENABLE_PC_WORKERS" == "true" ]] && check_unit_enabled pc-workers-up
+  # The live machine runs the workers on demand, so a boot-time
+  # pc-workers-up unit must NOT exist on a parity install.
+  if [[ -e "$(target_path /etc/systemd/system/pc-workers-up.service)" ]]; then
+    check_fail "pc-workers-up.service absent (workers run on demand)"
   else
-    [[ "$ENABLE_PC_WORKERS" == "true" ]] && check_unit_enabled pc-workers-up false
+    check_pass "pc-workers-up.service absent (workers run on demand)"
   fi
   [[ "$ENABLE_BPFTUNE" == "true" ]] && check_unit_enabled bpftune
   [[ "$ENABLE_NVIDIA_SUSPEND_HOOKS" == "true" ]] && check_unit_enabled nvidia-suspend
@@ -465,13 +467,6 @@ check_pc_parity_files() {
   check_file_exists "$(target_path "/home/$PC_USER/docker/pc-workers-compose.yml")"
   check_file_exists "$(target_path "/home/$PC_USER/docker/pc-workers.env")"
   check_file_exists "$(target_path "/home/$PC_USER/docker/pc-workers/.env")"
-  if [[ "$TARGET_MODE" == "live" || "$EXPECT_INSTALLED_MARKERS" == "true" ]]; then
-    check_file_exists "$(target_path /etc/systemd/system/pc-workers-up.service)"
-  elif [[ -e "$(target_path /etc/systemd/system/pc-workers-up.service)" ]]; then
-    check_pass "/etc/systemd/system/pc-workers-up.service exists"
-  else
-    check_warn "pc-workers-up.service not installed (pre-bootstrap host)"
-  fi
   if [[ "$SETUP_DOTFILES" == "true" ]]; then
     check_file_exists "$(target_path "/home/$PC_USER/.local/bin/sunshine-pick-primary.sh")"
   fi
