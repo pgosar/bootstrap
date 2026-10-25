@@ -499,6 +499,7 @@ check_pc_parity_files() {
   check_file_exists "$(target_path "/home/$PC_USER/docker/pc-workers/.env")"
   if [[ "$SETUP_DOTFILES" == "true" ]]; then
     check_file_exists "$(target_path "/home/$PC_USER/.local/bin/sunshine-pick-primary.sh")"
+    check_file_exists "$(target_path "/home/$PC_USER/.config/systemd/user/graphical-session.target.wants/app-dev.lizardbyte.app.Sunshine.service")"
   fi
 }
 
