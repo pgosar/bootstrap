@@ -138,8 +138,15 @@ configure_pc_system_files() {
     run install -Dm 0644 "$PC_ROOT/config/keyd/by-tech-gaming-keyboard.conf" "$(target_path /etc/keyd/by-tech-gaming-keyboard.conf)"
     run install -Dm 0644 "$PC_ROOT/config/sysctl/99-bbr.conf" "$(target_path /etc/sysctl.d/99-bbr.conf)"
     run install -Dm 0644 "$PC_ROOT/config/sysctl/40-ipv6.conf" "$(target_path /etc/sysctl.d/40-ipv6.conf)"
+    run install -Dm 0644 "$PC_ROOT/config/system/10-suspend-mode.conf" "$(target_path /etc/systemd/sleep.conf.d/10-suspend-mode.conf)"
+    run install -Dm 0644 "$PC_ROOT/config/system/10-chwd.conf" "$(target_path /etc/mkinitcpio.conf.d/10-chwd.conf)"
+    run install -Dm 0644 "$PC_ROOT/config/system/10-chwd-kms.conf" "$(target_path /etc/mkinitcpio.conf.d/10-chwd-kms.conf)"
+    run install -Dm 0644 "$PC_ROOT/config/system/90-8bitdo-retro-keyboard-modifiers.hwdb" "$(target_path /etc/udev/hwdb.d/90-8bitdo-retro-keyboard-modifiers.hwdb)"
+    target_run systemd-hwdb update
+    run install -Dm 0644 "$PC_ROOT/config/system/logrotate.service" "$(target_path /etc/systemd/system/logrotate.service)"
+    run install -Dm 0644 "$PC_ROOT/config/system/logrotate.timer" "$(target_path /etc/systemd/system/logrotate.timer)"
   else
-    log "+ install PC system files (nvidia workaround, keychron rule, remove-nvidia, docker/lact/plasmalogin configs, keyd, sysctl)"
+    log "+ install PC system files (nvidia workaround, keychron rule, remove-nvidia, docker/lact/plasmalogin configs, keyd, sysctl, sleep mode, mkinitcpio drop-ins, hwdb, logrotate, mcpelauncher links)"
   fi
 }
 

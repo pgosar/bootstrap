@@ -1,0 +1,7 @@
+# 8BitDo Retro Keyboard (USB vendor 2dc8, product 5200)
+# Remap only this keyboard's physical modifier keys.
+evdev:input:b0003v2DC8p5200*
+ KEYBOARD_KEY_70039=leftctrl
+ KEYBOARD_KEY_700e0=capslock
+ KEYBOARD_KEY_700e2=leftmeta
+ KEYBOARD_KEY_700e3=leftalt
