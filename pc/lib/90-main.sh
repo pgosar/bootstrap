@@ -86,12 +86,24 @@ enable_services() {
     [[ "$ENABLE_RAM_RGB" == "true" ]] && enable_target_unit ram-rgb-off.timer
     [[ "$ENABLE_PC_WOL" == "true" ]] && enable_target_unit pc-wol
     [[ "$ENABLE_PC_WORKERS" == "true" ]] && enable_target_unit pc-workers-up
+    [[ "$ENABLE_BPFTUNE" == "true" ]] && enable_target_unit bpftune
+    [[ "$ENABLE_NVIDIA_SUSPEND_HOOKS" == "true" ]] && enable_target_unit nvidia-suspend
+    [[ "$ENABLE_NVIDIA_SUSPEND_HOOKS" == "true" ]] && enable_target_unit nvidia-resume
     [[ "$ENABLE_UFW" == "true" ]] && enable_target_unit ufw
     [[ "$ENABLE_AVAHI" == "true" ]] && enable_target_unit avahi-daemon
     enable_target_unit sshd
     [[ "$ENABLE_FSTRIM_TIMER" == "true" ]] && enable_target_unit fstrim.timer
     enable_target_unit snapper-cleanup.timer
-    enable_target_unit snapper-timeline.timer false
+    if [[ "$ENABLE_SNAPPER_TIMELINE" == "true" ]]; then
+      enable_target_unit snapper-timeline.timer
+    else
+      disable_target_unit snapper-timeline.timer
+    fi
+    if [[ "$ENABLE_SYSTEMD_OOMD" == "true" ]]; then
+      enable_target_unit systemd-oomd
+    else
+      disable_target_unit systemd-oomd
+    fi
     enable_target_unit workstation-state-recorder.timer
     [[ "$ENABLE_SMARTD" == "true" ]] && enable_target_unit smartd
     [[ "$ENABLE_NFTABLES" == "true" ]] && enable_target_unit nftables
