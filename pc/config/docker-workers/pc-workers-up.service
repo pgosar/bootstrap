@@ -1,0 +1,14 @@
+[Unit]
+Description=Create the PC Docker worker containers
+After=docker.service network-online.target
+Wants=network-online.target
+RequiresMountsFor=/home/__PC_USER__/Server/media /home/__PC_USER__/Server/torrents
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/docker compose --env-file /home/__PC_USER__/docker/pc-workers.env -f /home/__PC_USER__/docker/pc-workers-compose.yml up -d immich-machine-learning-pc
+ExecStart=/usr/bin/docker compose -f /home/__PC_USER__/docker/pc-workers/compose.yml up -d tdarr-node
+
+[Install]
+WantedBy=multi-user.target
