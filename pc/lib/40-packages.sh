@@ -1,22 +1,85 @@
+set_pacman_conf_basics() {
+  # $1 = pacman.conf path (plain file edit): ParallelDownloads + multilib.
+  local pacman_conf="$1"
+  if grep -Eq '^[#[:space:]]*ParallelDownloads[[:space:]]*=' "$pacman_conf"; then
+    sed -i 's/^[#[:space:]]*ParallelDownloads[[:space:]]*=.*/ParallelDownloads = 50/' "$pacman_conf"
+  else
+    printf '\nParallelDownloads = 50\n' >>"$pacman_conf"
+  fi
+  sed -i '/^\#\[multilib\]/{s/^#//;n;s/^#//;}' "$pacman_conf"
+}
+
+cachyos_repo_sections() {
+  local variant="${CACHYOS_VARIANT:-znver4}"
+  cat <<EOF
+[cachyos-$variant]
+Include = /etc/pacman.d/cachyos-v4-mirrorlist
+
+[cachyos-core-$variant]
+Include = /etc/pacman.d/cachyos-v4-mirrorlist
+
+[cachyos-extra-$variant]
+Include = /etc/pacman.d/cachyos-v4-mirrorlist
+
+[cachyos]
+Include = /etc/pacman.d/cachyos-mirrorlist
+EOF
+}
+
+add_cachyos_repo_sections() {
+  # $1 = pacman.conf path. Inserts the CachyOS sections before [core].
+  local pacman_conf="$1"
+  grep -q '^\[cachyos\]' "$pacman_conf" && return 0
+  local sections
+  sections="$(cachyos_repo_sections)"
+  awk -v block="$sections" 'BEGIN { done=0 } /^\[core\]/ { if (!done) { print block; print ""; done=1 } } { print }' "$pacman_conf" >"$pacman_conf.tmp"
+  mv "$pacman_conf.tmp" "$pacman_conf"
+}
+
+install_cachyos_keyring_host() {
+  # Trusts the CachyOS key on the CURRENT system (the ISO in live mode, the
+  # host in host mode) and installs the mirrorlist packages pacman needs to
+  # use the new repos. No-op when the key is already trusted.
+  if pacman-key --list-keys 2>/dev/null | grep -q "$CACHYOS_KEY_FPR"; then
+    return 0
+  fi
+  local staging="$STAGING_DIR/cachyos-repo"
+  run mkdir -p "$staging"
+  run curl -fsSL -o "$staging/cachyos-repo.tar.zst" "https://mirror.cachyos.org/cachyos-repo.tar.zst"
+  run tar -xf "$staging/cachyos-repo.tar.zst" -C "$staging"
+  local pkgs=() f
+  while IFS= read -r f; do pkgs+=("$f"); done < <(find "$staging" -name "cachyos-keyring-*.pkg.tar.zst" -o -name "cachyos-*-mirrorlist-*.pkg.tar.zst")
+  [[ "${#pkgs[@]}" -gt 0 ]] || die "cachyos keyring/mirrorlist packages not found in repo bundle"
+  run pacman -U --noconfirm "${pkgs[@]}"
+}
+
 configure_pacman_for_target() {
   local pacman_conf
   pacman_conf="$(target_path /etc/pacman.conf)"
 
   if [[ "$APPLY" != true ]]; then
-    log "+ enable ParallelDownloads and multilib in $(printf '%q' "$pacman_conf")"
+    log "+ configure CachyOS repos, ParallelDownloads and multilib in $(printf '%q' "$pacman_conf")"
     return 0
   fi
 
   [[ -f "$pacman_conf" ]] || die "pacman config not found: $pacman_conf"
   backup_file "$pacman_conf"
 
-  if grep -Eq '^[#[:space:]]*ParallelDownloads[[:space:]]*=' "$pacman_conf"; then
-    sed -i 's/^[#[:space:]]*ParallelDownloads[[:space:]]*=.*/ParallelDownloads = 50/' "$pacman_conf"
-  else
-    printf '\nParallelDownloads = 50\n' >>"$pacman_conf"
+  if ! grep -q '^\[cachyos\]' "$pacman_conf"; then
+    if [[ "$TARGET_MODE" == "live" ]]; then
+      # The bundle was fetched during the pacstrap phase; install its
+      # keyring + mirrorlist packages into the target.
+      local host_bundle="$STAGING_DIR/cachyos-repo"
+      [[ -d "$host_bundle" ]] || die "cachyos repo bundle missing: $host_bundle (pacstrap phase must run first in live mode)"
+      run mkdir -p "$(target_path /tmp/cachyos-repo)"
+      run find "$host_bundle" -name "cachyos-keyring-*.pkg.tar.zst" -o -name "cachyos-*-mirrorlist-*.pkg.tar.zst" -exec cp {} "$(target_path /tmp/cachyos-repo/)" +
+      target_run bash -lc "pacman -U --noconfirm /tmp/cachyos-repo/*.pkg.tar.zst"
+    else
+      install_cachyos_keyring_host
+    fi
+    add_cachyos_repo_sections "$pacman_conf"
   fi
-
-  sed -i '/^\#\[multilib\]/{s/^#//;n;s/^#//;}' "$pacman_conf"
+  set_pacman_conf_basics "$pacman_conf"
 }
 
 install_packages() {
