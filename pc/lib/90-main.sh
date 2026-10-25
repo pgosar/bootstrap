@@ -85,7 +85,6 @@ enable_services() {
     [[ "$ENABLE_RAM_RGB" == "true" ]] && enable_target_unit ram-rgb-on.timer
     [[ "$ENABLE_RAM_RGB" == "true" ]] && enable_target_unit ram-rgb-off.timer
     [[ "$ENABLE_PC_WOL" == "true" ]] && enable_target_unit pc-wol
-    [[ "$ENABLE_PC_WORKERS" == "true" ]] && enable_target_unit pc-workers-up
     [[ "$ENABLE_BPFTUNE" == "true" ]] && enable_target_unit bpftune
     [[ "$ENABLE_NVIDIA_SUSPEND_HOOKS" == "true" ]] && enable_target_unit nvidia-suspend
     [[ "$ENABLE_NVIDIA_SUSPEND_HOOKS" == "true" ]] && enable_target_unit nvidia-resume
