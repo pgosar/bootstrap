@@ -171,6 +171,13 @@ configure_pc_system_files() {
     run install -Dm 0644 "$PC_ROOT/config/system/logrotate.timer" "$(target_path /etc/systemd/system/logrotate.timer)"
     run ln -sf /opt/mcpelauncher-bin/bin/mcpelauncher-client "$(target_path /usr/local/bin/mcpelauncher-client)"
     run ln -sf /opt/mcpelauncher-bin/bin/mcpelauncher-ui-qt "$(target_path /usr/local/bin/mcpelauncher-ui-qt)"
+    run install -Dm 0600 "$PC_ROOT/config/libvirt/storage-chilly.xml" "$(target_path /etc/libvirt/storage/chilly.xml)"
+    run sed -i -e "s/__PC_USER__/$PC_USER/g" "$(target_path /etc/libvirt/storage/chilly.xml)"
+    run install -Dm 0600 "$PC_ROOT/config/libvirt/storage-default.xml" "$(target_path /etc/libvirt/storage/default.xml)"
+    run install -Dm 0600 "$PC_ROOT/config/libvirt/qemu-archlinux.xml" "$(target_path /etc/libvirt/qemu/archlinux.xml)"
+    run install -d "$(target_path /etc/libvirt/storage/autostart)"
+    run ln -sf /etc/libvirt/storage/chilly.xml "$(target_path /etc/libvirt/storage/autostart/chilly.xml)"
+    run ln -sf /etc/libvirt/storage/default.xml "$(target_path /etc/libvirt/storage/autostart/default.xml)"
   else
     log "+ install PC system files (nvidia workaround, keychron rule, remove-nvidia, docker/lact/plasmalogin configs, keyd, sysctl, sleep mode, mkinitcpio drop-ins, hwdb, logrotate, mcpelauncher links)"
   fi
