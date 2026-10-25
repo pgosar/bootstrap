@@ -62,6 +62,16 @@
    create mask = 0660
    directory mask = 0770
 
+[data]
+   path = /data
+   browseable = yes
+   read only = no
+   valid users = @nas
+   create mask = 0664
+   directory mask = 0775
+   veto files = /secrets/
+   hide files = /secrets/
+
 [timemachine]
    path = /data/backups/time-machine
    browseable = yes
