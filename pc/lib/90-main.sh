@@ -56,6 +56,7 @@ main() {
   configure_services
   configure_service_files
   configure_pc_service_files
+  configure_docker_workers
   setup_dotfiles
 
   if [[ "$ENABLE_SERVICES" == true ]]; then
@@ -84,6 +85,7 @@ enable_services() {
     [[ "$ENABLE_RAM_RGB" == "true" ]] && enable_target_unit ram-rgb-on.timer
     [[ "$ENABLE_RAM_RGB" == "true" ]] && enable_target_unit ram-rgb-off.timer
     [[ "$ENABLE_PC_WOL" == "true" ]] && enable_target_unit pc-wol
+    [[ "$ENABLE_PC_WORKERS" == "true" ]] && enable_target_unit pc-workers-up
     [[ "$ENABLE_UFW" == "true" ]] && enable_target_unit ufw
     [[ "$ENABLE_AVAHI" == "true" ]] && enable_target_unit avahi-daemon
     enable_target_unit sshd

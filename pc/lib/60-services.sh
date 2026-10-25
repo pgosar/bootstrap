@@ -56,6 +56,33 @@ configure_pc_service_files() {
   run install -Dm 0755 "$PC_ROOT/config/ram-rgb/ram-rgb.sleep" "$(target_path /usr/lib/systemd/system-sleep/ram-rgb)"
 }
 
+configure_docker_workers() {
+  [[ "$ENABLE_PC_WORKERS" == "true" ]] || return 0
+  [[ "$SERVICES" == true || "$ENABLE_SERVICES" == true ]] || return 0
+  require_root
+  if [[ "$APPLY" != true ]]; then
+    log "+ install Docker workers stack under /home/$PC_USER/docker"
+    return 0
+  fi
+  local home="/home/$PC_USER"
+  target_run install -d -o "$PC_USER" -g "$PC_USER" "$home/docker" "$home/docker/pc-workers" \
+    "$home/docker/appdata/tdarr-node/configs" "$home/docker/appdata/tdarr-node/logs" \
+    "$home/docker/appdata/tdarr-node/transcode-cache" "$home/docker/appdata/immich-machine-learning/model-cache"
+  run install -Dm 0644 "$PC_ROOT/config/docker-workers/pc-workers-compose.yml" "$(target_path "$home/docker/pc-workers-compose.yml")"
+  run install -Dm 0644 "$PC_ROOT/config/docker-workers/compose.yml" "$(target_path "$home/docker/pc-workers/compose.yml")"
+  if [[ ! -f "$(target_path "$home/docker/pc-workers.env")" ]]; then
+    run install -Dm 0600 "$PC_ROOT/config/docker-workers/env.top.example" "$(target_path "$home/docker/pc-workers.env")"
+    warn "wrote placeholder $home/docker/pc-workers.env: set TDARR_API_KEY before the workers can pair"
+  fi
+  if [[ ! -f "$(target_path "$home/docker/pc-workers/.env")" ]]; then
+    run install -Dm 0600 "$PC_ROOT/config/docker-workers/env.inner.example" "$(target_path "$home/docker/pc-workers/.env")"
+    warn "wrote placeholder $home/docker/pc-workers/.env: set TDARR_API_KEY before the workers can pair"
+  fi
+  target_run chown "$PC_USER:$PC_USER" "$home/docker/pc-workers-compose.yml" "$home/docker/pc-workers/compose.yml" "$home/docker/pc-workers.env" "$home/docker/pc-workers/.env"
+  run install -Dm 0644 "$PC_ROOT/config/docker-workers/pc-workers-up.service" "$(target_path /etc/systemd/system/pc-workers-up.service)"
+  run sed -i -e "s/__PC_USER__/$PC_USER/g" "$(target_path /etc/systemd/system/pc-workers-up.service)"
+}
+
 setup_dotfiles() {
   [[ "$SETUP_DOTFILES" == "true" ]] || return 0
   [[ "$SERVICES" == true || "$ENABLE_SERVICES" == true ]] || return 0
