@@ -1,0 +1,18 @@
+version: 7
+daemon:
+  log_level: info
+  admin_group: wheel
+  disable_clocks_cleanup: false
+apply_settings_timer: 5
+gpus:
+  10DE:2B85-1458:416E-0000:01:00.0:
+    fan_control_enabled: false
+    power_cap: 550.0
+    min_core_clock: 1167
+    max_core_clock: 2827
+    gpu_clock_offsets:
+      0: 815
+    mem_clock_offsets:
+      0: 4400
+current_profile: null
+auto_switch_profiles: false
