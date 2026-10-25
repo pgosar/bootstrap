@@ -1,12 +1,15 @@
 # AUR packages installed after yay is bootstrapped in the target OS.
 # Format: package expected-version
-accounts-qml-module 0.7-8
-gdlauncher-carbon-bin 2.0.30-5
+blender-benchmark-bin 3.3.0-3
+gdlauncher-carbon-bin 2.0.40-1
 hstr 3.2-1
-jdupes 1.31.1-1
-jellyfin-desktop-git 1:0.r1037.225af09-1
-libjodycode 4.1.2-1
-pacman-static 7.1.0.r9.g54d9411-13
-spicetify-bin 2.43.2-1
-spotify 1:1.2.92.147-1
+hypr-persist 0.1.2-1
+jellyfin-desktop-git 1:2.0.0.r172.g2cb4a44-2
+mcpelauncher-linux-bin 1.8.4.35236987803.1~bookworm-2
+mcpelauncher-msa-ui-qt-git 0.9.0.r2.gdc2c2d6-1
+mcpelauncher-ui-bin 1.8.4.35236987803.1~bookworm-1
+pacman-static 7.1.0.r9.g54d9411-23
+python-pywal 3.3.0-11
+spicetify-bin 2.45.3-1
+spotify 1:1.2.96.518-2
 wl-gammarelay-rs 1.0.1-1
