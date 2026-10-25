@@ -216,6 +216,16 @@ check_unit_enabled() {
   fi
 }
 
+check_unit_disabled() {
+  local unit="$1" state
+  state="$(check_run_target_capture systemctl is-enabled "$unit" 2>/dev/null || true)"
+  if [[ "$state" == "disabled" ]]; then
+    check_pass "$unit disabled"
+  else
+    check_fail "$unit disabled (found: ${state:-missing})"
+  fi
+}
+
 check_unit_active_host() {
   local unit="$1" required="${2:-true}"
   if systemctl is-active "$unit" >/dev/null 2>&1; then
@@ -359,6 +369,10 @@ check_expected_services_enabled() {
   [[ "$ENABLE_RAM_RGB" == "true" ]] && check_unit_enabled ram-rgb-on.timer
   [[ "$ENABLE_RAM_RGB" == "true" ]] && check_unit_enabled ram-rgb-off.timer
   [[ "$ENABLE_PC_WOL" == "true" ]] && check_unit_enabled pc-wol
+  [[ "$ENABLE_PC_WORKERS" == "true" ]] && check_unit_enabled pc-workers-up false
+  [[ "$ENABLE_BPFTUNE" == "true" ]] && check_unit_enabled bpftune
+  [[ "$ENABLE_NVIDIA_SUSPEND_HOOKS" == "true" ]] && check_unit_enabled nvidia-suspend
+  [[ "$ENABLE_NVIDIA_SUSPEND_HOOKS" == "true" ]] && check_unit_enabled nvidia-resume
   [[ "$ENABLE_UFW" == "true" ]] && check_unit_enabled ufw
   [[ "$ENABLE_AVAHI" == "true" ]] && check_unit_enabled avahi-daemon
   [[ "$ENABLE_SYSTEMD_RESOLVED" == "true" ]] && check_unit_enabled systemd-resolved
@@ -366,7 +380,16 @@ check_expected_services_enabled() {
   check_unit_enabled sshd
   [[ "$ENABLE_FSTRIM_TIMER" == "true" ]] && check_unit_enabled fstrim.timer
   check_unit_enabled snapper-cleanup.timer
-  check_unit_enabled snapper-timeline.timer false
+  if [[ "$ENABLE_SNAPPER_TIMELINE" == "true" ]]; then
+    check_unit_enabled snapper-timeline.timer
+  else
+    check_unit_disabled snapper-timeline.timer
+  fi
+  if [[ "$ENABLE_SYSTEMD_OOMD" == "true" ]]; then
+    check_unit_enabled systemd-oomd
+  else
+    check_unit_disabled systemd-oomd
+  fi
   check_file_exists "$(target_path /usr/local/bin/workstation-state-recorder)"
   check_file_exists "$(target_path /usr/local/bin/workstation-state-prune)"
   check_file_exists "$(target_path /etc/systemd/system/workstation-state-recorder.service)"
@@ -390,6 +413,26 @@ check_pc_parity_files() {
   check_file_contains "$(target_path "/etc/NetworkManager/system-connections/Wired connection 1.nmconnection")" "address1=$PC_STATIC_ADDRESS" "static IP profile present"
   check_file_contains "$(target_path /etc/fstab)" "//$NAS_SERVER_IP/media" "fstab has NAS media mount"
   check_file_exists "$(target_path /etc/.nascreds)"
+  check_file_contains "$(target_path /etc/docker/daemon.json)" "nvidia-container-runtime" "docker nvidia runtime configured"
+  check_file_contains "$(target_path /etc/lact/config.yaml)" "power_cap: 550" "LACT GPU tuning present"
+  check_file_exists "$(target_path /etc/keyd/8bitdo-retro-keyboard.conf)"
+  check_file_exists "$(target_path /etc/keyd/by-tech-gaming-keyboard.conf)"
+  check_file_contains "$(target_path /etc/sysctl.d/99-bbr.conf)" "tcp_congestion_control=bbr" "BBR sysctl present"
+  check_file_contains "$(target_path /etc/sysctl.d/40-ipv6.conf)" "disable_ipv6" "IPv6 sysctl present"
+  check_file_contains "$(target_path /etc/plasmalogin.conf)" "Session=plasma" "plasmalogin autologin present"
+  check_file_exists "$(target_path "/etc/NetworkManager/system-connections/ATTcFikS2f-5g.nmconnection")"
+  check_file_exists "$(target_path "/home/$PC_USER/docker/pc-workers/compose.yml")"
+  check_file_exists "$(target_path "/home/$PC_USER/docker/pc-workers-compose.yml")"
+  check_file_exists "$(target_path "/home/$PC_USER/docker/pc-workers.env")"
+  check_file_exists "$(target_path "/home/$PC_USER/docker/pc-workers/.env")"
+  if [[ -e "$(target_path /etc/systemd/system/pc-workers-up.service)" ]]; then
+    check_pass "/etc/systemd/system/pc-workers-up.service exists"
+  else
+    check_warn "pc-workers-up.service not installed (pre-bootstrap host)"
+  fi
+  if [[ "$SETUP_DOTFILES" == "true" ]]; then
+    check_file_exists "$(target_path "/home/$PC_USER/.local/bin/sunshine-pick-primary.sh")"
+  fi
 }
 
 check_ufw_rules() {
