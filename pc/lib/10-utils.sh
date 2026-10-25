@@ -150,6 +150,27 @@ enable_target_unit() {
   fi
 }
 
+disable_target_unit() {
+  local unit="$1"
+
+  if [[ "$APPLY" != true ]]; then
+    log "+ disable unit $(printf '%q' "$unit")"
+    return 0
+  fi
+
+  if ! target_unit_available "$unit"; then
+    warn "systemd unit is not available in target; skipping disable: $unit"
+    return 0
+  fi
+
+  log "+ disable unit $(printf '%q' "$unit")"
+  if [[ "$TARGET_MODE" == "live" ]]; then
+    systemctl --root="$TARGET_ROOT" disable "$unit" || warn "failed to disable unit: $unit"
+  elif ! systemctl disable "$unit"; then
+    warn "failed to disable unit: $unit"
+  fi
+}
+
 start_target_unit() {
   local unit="$1"
   local required="${2:-true}"
