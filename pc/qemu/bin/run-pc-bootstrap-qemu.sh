@@ -106,6 +106,14 @@ python3 "$PC_ROOT/qemu/lib/drive-serial.py" \
   "$LOGDIR/qemu-install-serial.log" \
   "curl -fsSL http://10.0.2.2:$HTTP_PORT/pc-stage1.sh | bash"
 
+# drive-serial.py returns 0 when the guest powers off, success or failure.
+# Do not boot an unfinished disk: stage 2 would sit in UEFI with no
+# bootloader and mask the real stage 1 error.
+if ! grep -qF '[pc-qemu-stage1] complete' "$LOGDIR/qemu-install-serial.log"; then
+  printf 'Stage 1 did not complete; see %s\n' "$LOGDIR/qemu-install-serial.log" >&2
+  exit 1
+fi
+
 printf 'Booting installed system for health check...\n'
 "$QEMU_BIN" \
   "${base_qemu_args[@]}" \
