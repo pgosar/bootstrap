@@ -39,11 +39,11 @@ configure_data_disk() {
     ensure_dir "$active_mountpoint/pool/$directory"
     run chown "$PUID:$PGID" "$active_mountpoint/pool/$directory"
     if [[ "$directory" == .secrets-encrypted ]]; then
-      run chmod 0700 "$active_mountpoint/pool/$directory"
+      run chmod 2700 "$active_mountpoint/pool/$directory"
     elif [[ "$directory" == personal || "$directory" == backups ]]; then
       run chmod 2770 "$active_mountpoint/pool/$directory"
     else
-      run chmod 0775 "$active_mountpoint/pool/$directory"
+      run chmod 2775 "$active_mountpoint/pool/$directory"
     fi
   done
   for subvol in "${POOL_SUBVOLUMES[@]}"; do
@@ -52,7 +52,7 @@ configure_data_disk() {
       if [[ "$subvol" == .secrets-encrypted ]]; then
         run chmod 0700 "$active_mountpoint/pool/$subvol"
       else
-        run chmod 0775 "$active_mountpoint/pool/$subvol"
+        run chmod 2775 "$active_mountpoint/pool/$subvol"
       fi
       continue
     fi
@@ -61,7 +61,7 @@ configure_data_disk() {
     if [[ "$subvol" == .secrets-encrypted ]]; then
       run chmod 0700 "$active_mountpoint/pool/$subvol"
     else
-      run chmod 0775 "$active_mountpoint/pool/$subvol"
+      run chmod 2775 "$active_mountpoint/pool/$subvol"
     fi
   done
   # Locked-state symlink. The unlock helper temporarily replaces it with the
@@ -359,16 +359,16 @@ ensure_active_pool_permissions() {
   for directory in "${POOL_DIRECTORIES[@]}"; do
     run chown "$PUID:$PGID" "$active_data/$directory"
     if [[ "$directory" == .secrets-encrypted ]]; then
-      run chmod 0700 "$active_data/$directory"
+      run chmod 2700 "$active_data/$directory"
     elif [[ "$directory" == personal || "$directory" == backups ]]; then
       run chmod 2770 "$active_data/$directory"
     else
-      run chmod 0775 "$active_data/$directory"
+      run chmod 2775 "$active_data/$directory"
     fi
   done
   for subvol in "${POOL_SUBVOLUMES[@]}"; do
     run chown "$PUID:$PGID" "$active_data/$subvol"
-    run chmod 0775 "$active_data/$subvol"
+    run chmod 2775 "$active_data/$subvol"
   done
 }
 
