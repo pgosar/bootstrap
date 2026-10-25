@@ -32,7 +32,15 @@ check_file_exists() {
     local dest resolved
     dest="$(readlink "$path")"
     case "$dest" in
-      /*) resolved="$dest" ;;
+      /*)
+        resolved="$dest"
+        # Device nodes (the pacman hook masks point at /dev/null) are
+        # provided by the checker host, not the target root.
+        if [[ "$dest" == /dev/* && -e "$dest" ]]; then
+          check_pass "$path exists"
+          return 0
+        fi
+        ;;
       *) resolved="$(dirname "$path")/$dest" ;;
     esac
     if [[ -n "${TARGET_ROOT:-}" && "$resolved" != "$TARGET_ROOT"* ]]; then
@@ -470,6 +478,10 @@ check_pc_parity_files() {
   check_file_contains "$(target_path /etc/systemd/resolved.conf)" "DNS=1.1.1.1" "resolved.conf carries the live DNS servers"
   check_file_contains "$(target_path /etc/fuse.conf)" "user_allow_other" "fuse.conf allows FUSE allow_other"
   check_file_contains "$(target_path /etc/environment)" "EDITOR=nvim" "environment sets EDITOR to nvim"
+  check_file_contains "$(target_path /etc/os-release)" "ID=arch" "os-release carries the live Arch branding"
+  check_file_exists "$(target_path /etc/pacman.d/hooks/cachyos-branding.hook)"
+  check_file_exists "$(target_path /etc/pacman.d/hooks/cachyos-plymouth-initramfs.hook)"
+  check_file_exists "$(target_path /etc/pacman.d/hooks/cachyos-reboot-required.hook)"
   check_file_exists "$(target_path "/etc/NetworkManager/system-connections/ATTcFikS2f-5g.nmconnection")"
   check_file_exists "$(target_path "/home/$PC_USER/docker/pc-workers/compose.yml")"
   check_file_exists "$(target_path "/home/$PC_USER/docker/pc-workers-compose.yml")"
