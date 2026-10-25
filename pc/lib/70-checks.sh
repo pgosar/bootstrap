@@ -22,7 +22,28 @@ print_check_summary() {
 
 check_file_exists() {
   local path="$1"
-  [[ -e "$path" ]] && check_pass "$path exists" || check_fail "$path exists"
+  if [[ -e "$path" ]]; then
+    check_pass "$path exists"
+    return 0
+  fi
+  if [[ -L "$path" ]]; then
+    # A symlink target resolves against the checker's root, not the
+    # target root; re-root the target before calling it missing.
+    local dest resolved
+    dest="$(readlink "$path")"
+    case "$dest" in
+      /*) resolved="$dest" ;;
+      *) resolved="$(dirname "$path")/$dest" ;;
+    esac
+    if [[ -n "${TARGET_ROOT:-}" && "$resolved" != "$TARGET_ROOT"* ]]; then
+      resolved="$TARGET_ROOT$resolved"
+    fi
+    if [[ -e "$resolved" ]]; then
+      check_pass "$path exists"
+      return 0
+    fi
+  fi
+  check_fail "$path exists"
 }
 
 check_file_contains() {
