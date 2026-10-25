@@ -123,3 +123,59 @@ setup_fnm() {
   # zshrc (eval "$(fnm env --use-on-cd)") provides node/npm.
   target_run runuser -u "$PC_USER" -- bash -lc "fnm install --lts && fnm default lts-latest"
 }
+
+configure_pc_system_files() {
+  [[ "$SYSTEM" == true || "$SERVICES" == true || "$ENABLE_SERVICES" == true ]] || return 0
+  require_root
+  if [[ "$APPLY" == true ]]; then
+    target_run install -Dm 0644 "$PC_ROOT/config/system/nvidia-suspend-workaround.conf" /etc/modprobe.d/nvidia-suspend-workaround.conf
+    target_run install -Dm 0644 "$PC_ROOT/config/system/92-keychron-via.rules" /etc/udev/rules.d/92-keychron-via.rules
+    target_run install -Dm 0755 "$PC_ROOT/config/system/remove-nvidia" /usr/local/bin/remove-nvidia
+  else
+    log "+ install PC system files (nvidia modprobe workaround, keychron udev rule, remove-nvidia)"
+  fi
+}
+
+configure_network_profile() {
+  [[ "$SYSTEM" == true || "$SERVICES" == true || "$ENABLE_SERVICES" == true ]] || return 0
+  require_root
+  if [[ "$APPLY" == true ]]; then
+    target_run install -Dm 0600 "$PC_ROOT/config/network/Wired connection 1.nmconnection" "/etc/NetworkManager/system-connections/Wired connection 1.nmconnection"
+  else
+    log "+ install NetworkManager wired profile (static $PC_STATIC_ADDRESS via $PC_GATEWAY)"
+  fi
+}
+
+configure_nas_mounts() {
+  [[ "$SYSTEM" == true || "$SERVICES" == true || "$ENABLE_SERVICES" == true ]] || return 0
+  require_root
+  local fstab
+  fstab="$(target_path /etc/fstab)"
+  if [[ "$APPLY" != true ]]; then
+    log "+ add NAS CIFS mounts (//$NAS_SERVER_IP shares) to $fstab and install /etc/.nascreds"
+    return 0
+  fi
+  [[ -f "$fstab" ]] || die "fstab not found: $fstab"
+  if ! grep -q '# pc-bootstrap: nas mounts' "$fstab"; then
+    backup_file "$fstab"
+    {
+      printf '# pc-bootstrap: nas mounts\n'
+      local share
+      for share in "${NAS_SHARES[@]}"; do
+        printf '//%s/%s /home/%s/Server/%s cifs credentials=/etc/.nascreds,uid=1000,gid=1000,dir_mode=0775,file_mode=0664,_netdev,nofail,x-systemd.automount,x-systemd.idle-timeout=60 0 0\n' "$NAS_SERVER_IP" "$share" "$PC_USER" "$share"
+      done
+    } >>"$fstab"
+  fi
+  local share
+  for share in "${NAS_SHARES[@]}"; do
+    target_run install -d -m 0755 -o "$PC_USER" -g "$PC_USER" "/home/$PC_USER/Server/$share"
+  done
+  if [[ -n "${NAS_CREDS_SOURCE:-}" && -f "$NAS_CREDS_SOURCE" ]]; then
+    run install -Dm 0600 "$NAS_CREDS_SOURCE" "$(target_path /etc/.nascreds)"
+  elif [[ ! -f "$(target_path /etc/.nascreds)" ]]; then
+    warn "NAS_CREDS_SOURCE unset: writing placeholder /etc/.nascreds - fill in username=/password= before the mounts can authenticate"
+    write_text "$(target_path /etc/.nascreds)" "username=REPLACE_ME
+password=REPLACE_ME"
+    run chmod 0600 "$(target_path /etc/.nascreds)"
+  fi
+}
