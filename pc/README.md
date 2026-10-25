@@ -59,11 +59,20 @@ The PC bootstrap mirrors the current host shape:
 * GRUB on UEFI
 * Btrfs root subvolumes for `@`, `@home`, `@root`, `@srv`, `@cache`, `@tmp`, and `@log`
 * `amd-ucode`
-* the host package set from `packages.txt`
-* system services such as NetworkManager, libvirt, ly, ufw, avahi, and timesync
+* The CachyOS pacman repos (znver4) with the `linux-cachyos` + `linux-cachyos-lts`
+  kernels and their NVIDIA open modules
+* the host package set from `packages.txt` + `aur-packages.txt` (kept at parity
+  with the live host: every change to the PC ships as a bootstrap commit)
+* system services such as NetworkManager, libvirt, plasmalogin, ufw, avahi,
+  tailscaled, docker, keyd, and timesync
+* the PC's own pieces from `pc/config/`: Wake-on-LAN support, ssh-inhibit,
+  the RAM RGB clock schedule, the NVIDIA suspend workaround, the Keychron
+  udev rule, the static-IP NetworkManager profile, and the NAS CIFS mounts
+  (credentials come from `NAS_CREDS_SOURCE`, never from the repo)
 
-It does not set up dotfiles-only shell plugins. Those stay in the dotfiles
-repo’s own install flow.
+With `SETUP_DOTFILES=true` (the default) the services phase also clones
+`pgosar/dotfiles` into `~/code/dotfiles` and runs its `install.sh`, so a
+rebuild lands the full user setup in one run.
 
 ## QEMU
 
