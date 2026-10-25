@@ -1,0 +1,6 @@
+[Unit]
+Description=RAM lighting: apply the 08:00 clock state
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ram-rgb.sh apply

@@ -1,0 +1,7 @@
+#!/bin/bash
+# RAM stays dark while the machine sleeps; the clock state returns on wake.
+case "$1" in
+  pre) /usr/local/bin/ram-rgb.sh off ;;
+  post) /usr/local/bin/ram-rgb.sh apply ;;
+esac
+exit 0

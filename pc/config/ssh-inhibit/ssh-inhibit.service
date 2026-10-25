@@ -1,0 +1,12 @@
+[Unit]
+Description=Inhibit sleep during SSH sessions
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ssh-inhibit.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
