@@ -463,6 +463,8 @@ check_pc_parity_files() {
   check_file_exists "$(target_path /etc/libvirt/storage/default.xml)"
   check_file_exists "$(target_path /etc/libvirt/qemu/archlinux.xml)"
   check_file_exists "$(target_path /etc/libvirt/storage/autostart/chilly.xml)"
+  check_file_exists "$(target_path /etc/libvirt/qemu/networks/default.xml)"
+  check_file_exists "$(target_path /etc/libvirt/qemu/networks/autostart/default.xml)"
   check_file_exists "$(target_path /usr/local/bin/mcpelauncher-client)"
   check_file_exists "$(target_path /usr/local/bin/mcpelauncher-ui-qt)"
   check_file_exists "$(target_path /etc/keyd/8bitdo-retro-keyboard.conf)"
