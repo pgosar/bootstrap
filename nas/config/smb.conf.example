@@ -71,4 +71,4 @@
    directory mask = 0770
    vfs objects = catia fruit streams_xattr
    fruit:time machine = yes
-   fruit:time machine max size = 2199023255552
+   fruit:time machine max size = 429496729600
