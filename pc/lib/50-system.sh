@@ -12,16 +12,18 @@ configure_users() {
     done
     # The live machine's user group is GID 1000; a group created during
     # package install can claim it first, so move any other holder aside.
+    # Read the group file directly: run/target_run echo each command to
+    # stdout, so their output cannot be captured for data.
     local holder holder_gid
-    holder="$(target_run getent group 1000 2>/dev/null | cut -d: -f1 || true)"
+    holder="$(awk -F: '$3 == 1000 {print $1; exit}' "$(target_path /etc/group)")"
     if [[ -n "$holder" && "$holder" != "$PC_USER" ]]; then
       holder_gid=1001
-      while target_run getent group "$holder_gid" >/dev/null 2>&1; do
+      while awk -F: -v g="$holder_gid" '$3 == g {found = 1} END {exit !found}' "$(target_path /etc/group)"; do
         holder_gid=$((holder_gid + 1))
       done
       target_run groupmod -g "$holder_gid" "$holder"
     fi
-    if target_run getent group "$PC_USER" >/dev/null 2>&1; then
+    if grep -q "^${PC_USER}:" "$(target_path /etc/group)"; then
       target_run groupmod -g 1000 "$PC_USER"
     else
       target_run groupadd -g 1000 "$PC_USER"
