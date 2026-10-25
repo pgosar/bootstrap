@@ -58,7 +58,7 @@ install_cachyos_keyring_host() {
     run curl -fsSL -o "$staging/$name" "$repo_url/$name"
   done < <(grep -oE 'cachyos-(keyring|[a-z0-9-]*mirrorlist)-[0-9][^"]*\.pkg\.tar\.zst' "$staging/repo-index.html" | sort -u)
   local pkgs=() f
-  while IFS= read -r f; do pkgs+=("$f"); done < <(find "$staging" -name "cachyos-keyring-*.pkg.tar.zst" -o -name "cachyos-*-mirrorlist-*.pkg.tar.zst")
+  while IFS= read -r f; do pkgs+=("$f"); done < <(find "$staging" -name "cachyos-keyring-*.pkg.tar.zst" -o -name "cachyos-mirrorlist-*.pkg.tar.zst" -o -name "cachyos-*-mirrorlist-*.pkg.tar.zst")
   [[ "${#pkgs[@]}" -gt 0 ]] || die "cachyos keyring/mirrorlist packages not found in repo index"
   run pacman -U --noconfirm "${pkgs[@]}"
 }
@@ -82,7 +82,7 @@ configure_pacman_for_target() {
       local host_bundle="$STAGING_DIR/cachyos-repo"
       [[ -d "$host_bundle" ]] || die "cachyos repo bundle missing: $host_bundle (pacstrap phase must run first in live mode)"
       run mkdir -p "$(target_path /tmp/cachyos-repo)"
-      run find "$host_bundle" -name "cachyos-keyring-*.pkg.tar.zst" -o -name "cachyos-*-mirrorlist-*.pkg.tar.zst" -exec cp {} "$(target_path /tmp/cachyos-repo/)" +
+      run find "$host_bundle" -name "cachyos-keyring-*.pkg.tar.zst" -o -name "cachyos-mirrorlist-*.pkg.tar.zst" -o -name "cachyos-*-mirrorlist-*.pkg.tar.zst" -exec cp {} "$(target_path /tmp/cachyos-repo/)" +
       target_run bash -lc "pacman -U --noconfirm /tmp/cachyos-repo/*.pkg.tar.zst"
     else
       install_cachyos_keyring_host
