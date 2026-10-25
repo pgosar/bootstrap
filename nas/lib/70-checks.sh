@@ -831,6 +831,8 @@ check_common_snapraid_btrbk_samba() {
     snapraid_output="$(check_run_target snapraid status 2>&1)" && snapraid_status=0 || snapraid_status=$?
     if [[ "$snapraid_status" -eq 0 ]]; then
       check_pass "snapraid status"
+    elif [[ "$snapraid_output" == *"already in use"* ]]; then
+      check_warn "SnapRAID busy: another operation holds the lock"
     elif [[ "$snapraid_output" == *"Error accessing 'content' dir"* || "$snapraid_output" == *"/var/lib/snapraid"* ]]; then
       printf '%s\n' "$snapraid_output"
       check_fail "snapraid content directory is accessible"
@@ -849,6 +851,8 @@ check_common_snapraid_btrbk_samba() {
       if [[ "$snapraid_output" == *"WARNING! Ignoring mount point"* ]]; then
         printf '%s\n' "$snapraid_output"
         check_fail "SnapRAID data entries cover Btrfs subvolume contents"
+      elif [[ "$snapraid_output" == *"already in use"* ]]; then
+        check_warn "SnapRAID diff could not be checked: operation in progress"
       else
         check_warn "SnapRAID diff could not be checked before initial sync"
       fi
