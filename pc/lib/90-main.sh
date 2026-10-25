@@ -47,11 +47,16 @@ main() {
   setup_fnm
   configure_snapper_root
   configure_ufw_rules
+  configure_pc_system_files
+  configure_network_profile
+  configure_nas_mounts
   if [[ "$INSTALL_ARCH" == true ]]; then
     finalize_installed_system "$TARGET_ROOT"
   fi
   configure_services
   configure_service_files
+  configure_pc_service_files
+  setup_dotfiles
 
   if [[ "$ENABLE_SERVICES" == true ]]; then
     enable_services
@@ -70,7 +75,15 @@ enable_services() {
     [[ "$ENABLE_NETWORKMANAGER" == "true" ]] && enable_target_unit NetworkManager
     [[ "$ENABLE_BLUETOOTH" == "true" ]] && enable_target_unit bluetooth
     [[ "$ENABLE_LIBVIRTD" == "true" ]] && enable_target_unit libvirtd
-    [[ "$ENABLE_LY" == "true" ]] && enable_target_unit "$LY_UNIT"
+    [[ "$ENABLE_PLASMALOGIN" == "true" ]] && enable_target_unit plasmalogin
+    [[ "$ENABLE_TAILSCALED" == "true" ]] && enable_target_unit tailscaled
+    [[ "$ENABLE_DOCKER" == "true" ]] && enable_target_unit docker
+    [[ "$ENABLE_KEYD" == "true" ]] && enable_target_unit keyd
+    [[ "$ENABLE_LACTD" == "true" ]] && enable_target_unit lactd
+    [[ "$ENABLE_SSH_INHIBIT" == "true" ]] && enable_target_unit ssh-inhibit
+    [[ "$ENABLE_RAM_RGB" == "true" ]] && enable_target_unit ram-rgb-on.timer
+    [[ "$ENABLE_RAM_RGB" == "true" ]] && enable_target_unit ram-rgb-off.timer
+    [[ "$ENABLE_PC_WOL" == "true" ]] && enable_target_unit pc-wol
     [[ "$ENABLE_UFW" == "true" ]] && enable_target_unit ufw
     [[ "$ENABLE_AVAHI" == "true" ]] && enable_target_unit avahi-daemon
     enable_target_unit sshd
@@ -98,7 +111,11 @@ start_services() {
     [[ "$ENABLE_NETWORKMANAGER" == "true" ]] && start_target_unit NetworkManager
     [[ "$ENABLE_BLUETOOTH" == "true" ]] && start_target_unit bluetooth
     [[ "$ENABLE_LIBVIRTD" == "true" ]] && start_target_unit libvirtd
-    [[ "$ENABLE_LY" == "true" ]] && start_target_unit "$LY_UNIT"
+    [[ "$ENABLE_TAILSCALED" == "true" ]] && start_target_unit tailscaled
+    [[ "$ENABLE_DOCKER" == "true" ]] && start_target_unit docker
+    [[ "$ENABLE_KEYD" == "true" ]] && start_target_unit keyd
+    [[ "$ENABLE_LACTD" == "true" ]] && start_target_unit lactd
+    [[ "$ENABLE_SSH_INHIBIT" == "true" ]] && start_target_unit ssh-inhibit
     [[ "$ENABLE_UFW" == "true" ]] && start_target_unit ufw
     [[ "$ENABLE_AVAHI" == "true" ]] && start_target_unit avahi-daemon
     start_target_unit sshd
