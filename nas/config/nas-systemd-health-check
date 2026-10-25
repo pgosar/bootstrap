@@ -29,7 +29,8 @@ fi
 log "FAILED UNITS DETECTED:"
 log "$failed"
 units_str=$(echo $failed | tr "\n" " ")
-[[ -x "$NOTIFY" ]] && "$NOTIFY" systemd-health "Failed units: $units_str" || true
+# DISABLED 2026-10-07 per user request - Casper handles failures
+# [[ -x "$NOTIFY" ]] && "$NOTIFY" systemd-health "Failed units: $units_str" || true
 
 for unit in $failed; do
   # Track consecutive failures
@@ -65,7 +66,8 @@ for unit in $failed; do
     # Extract key error lines for the alert
     errors=$(journalctl -u "$unit" --no-pager -n 50 -p err 2>/dev/null | head -5 | tr '\n' '; ')
     [[ -z "$errors" ]] && errors="(no error-level lines, see bundle)"
-    [[ -x "$NOTIFY" ]] && "$NOTIFY" systemd-health "INVESTIGATE $unit (failed ${count}x): ${errors}" || true
+    # DISABLED 2026-10-07 per user request
+    # [[ -x "$NOTIFY" ]] && "$NOTIFY" systemd-health "INVESTIGATE $unit (failed ${count}x): ${errors}" || true
     log "Investigation alert sent for $unit"
   fi
 done
