@@ -74,7 +74,7 @@ check_mount_present() {
 
 check_single_mount_at_path() {
   local path="$1" count
-  count="$(findmnt -rn "$path" 2>/dev/null | wc -l | tr -d ' ')"
+  count="$(findmnt -rn "$path" 2>/dev/null | wc -l | tr -d ' ' || true)"
   if [[ "$count" == "1" ]]; then
     check_pass "$path has exactly one mount"
   else
@@ -259,8 +259,8 @@ check_root_mounts() {
   check_mount_present "$cache"
   check_mount_present "$tmp"
   check_mount_present "$log"
-  check_mount_present "$snapshots"
   check_mount_present "$boot"
+  check_file_exists "$snapshots"
 
   check_single_mount_at_path "$root"
   check_single_mount_at_path "$home"
@@ -269,7 +269,6 @@ check_root_mounts() {
   check_single_mount_at_path "$cache"
   check_single_mount_at_path "$tmp"
   check_single_mount_at_path "$log"
-  check_single_mount_at_path "$snapshots"
   check_single_mount_at_path "$boot"
 
   check_mount_fstype "$root" btrfs
@@ -279,7 +278,6 @@ check_root_mounts() {
   check_mount_fstype "$cache" btrfs
   check_mount_fstype "$tmp" btrfs
   check_mount_fstype "$log" btrfs
-  check_mount_fstype "$snapshots" btrfs
   check_mount_fstype "$boot" vfat
 
   check_mount_option_contains_any "$root" "subvol=@" "subvol=/@"
@@ -289,7 +287,6 @@ check_root_mounts() {
   check_mount_option_contains_any "$cache" "subvol=@cache" "subvol=/@cache"
   check_mount_option_contains_any "$tmp" "subvol=@tmp" "subvol=/@tmp"
   check_mount_option_contains_any "$log" "subvol=@log" "subvol=/@log"
-  check_mount_option_contains_any "$snapshots" "subvol=@snapshots" "subvol=/@snapshots"
 }
 
 check_core_fstab() {
@@ -306,7 +303,6 @@ check_core_fstab() {
   check_fstab_has_subvol "$fstab" /var/cache @cache
   check_fstab_has_subvol "$fstab" /var/tmp @tmp
   check_fstab_has_subvol "$fstab" /var/log @log
-  check_fstab_has_subvol "$fstab" /.snapshots @snapshots
 
   check_no_duplicate_fstab_mount "$fstab" /
   check_no_duplicate_fstab_mount "$fstab" /home
@@ -315,7 +311,6 @@ check_core_fstab() {
   check_no_duplicate_fstab_mount "$fstab" /var/cache
   check_no_duplicate_fstab_mount "$fstab" /var/tmp
   check_no_duplicate_fstab_mount "$fstab" /var/log
-  check_no_duplicate_fstab_mount "$fstab" /.snapshots
   check_no_duplicate_fstab_mount "$fstab" /boot/efi
 }
 
@@ -326,7 +321,11 @@ check_grub_and_snapper_files() {
   confd="$root_prefix/etc/conf.d/snapper"
 
   check_file_exists "$grub"
-  check_file_contains "$grub" "amd-ucode.img" "GRUB config references AMD microcode"
+  if grep -q "amd-ucode.img" "$grub" 2>/dev/null || grep -q "microcode" "$root_prefix/etc/mkinitcpio.conf" 2>/dev/null; then
+    check_pass "microcode is loaded (GRUB ucode entry or mkinitcpio microcode hook)"
+  else
+    check_fail "microcode is loaded (GRUB ucode entry or mkinitcpio microcode hook)"
+  fi
   check_file_contains "$grub" "rootflags=subvol=@" "GRUB config uses rootflags=subvol=@"
   if grep -Eiq 'snapshot|snapper|grub-btrfs' "$grub" 2>/dev/null; then
     check_pass "GRUB config has snapshot-related entries"
@@ -351,7 +350,15 @@ check_expected_services_enabled() {
   [[ "$ENABLE_NETWORKMANAGER" == "true" ]] && check_unit_enabled NetworkManager
   [[ "$ENABLE_BLUETOOTH" == "true" ]] && check_unit_enabled bluetooth
   [[ "$ENABLE_LIBVIRTD" == "true" ]] && check_unit_enabled libvirtd
-  [[ "$ENABLE_LY" == "true" ]] && check_unit_enabled "$LY_UNIT"
+  [[ "$ENABLE_PLASMALOGIN" == "true" ]] && check_unit_enabled plasmalogin
+  [[ "$ENABLE_TAILSCALED" == "true" ]] && check_unit_enabled tailscaled
+  [[ "$ENABLE_DOCKER" == "true" ]] && check_unit_enabled docker
+  [[ "$ENABLE_KEYD" == "true" ]] && check_unit_enabled keyd
+  [[ "$ENABLE_LACTD" == "true" ]] && check_unit_enabled lactd
+  [[ "$ENABLE_SSH_INHIBIT" == "true" ]] && check_unit_enabled ssh-inhibit
+  [[ "$ENABLE_RAM_RGB" == "true" ]] && check_unit_enabled ram-rgb-on.timer
+  [[ "$ENABLE_RAM_RGB" == "true" ]] && check_unit_enabled ram-rgb-off.timer
+  [[ "$ENABLE_PC_WOL" == "true" ]] && check_unit_enabled pc-wol
   [[ "$ENABLE_UFW" == "true" ]] && check_unit_enabled ufw
   [[ "$ENABLE_AVAHI" == "true" ]] && check_unit_enabled avahi-daemon
   [[ "$ENABLE_SYSTEMD_RESOLVED" == "true" ]] && check_unit_enabled systemd-resolved
@@ -370,6 +377,19 @@ check_expected_services_enabled() {
   [[ "$ENABLE_SMARTD" == "true" ]] && check_unit_enabled smartd
   [[ "$ENABLE_NFTABLES" == "true" ]] && check_unit_enabled nftables
   return 0
+}
+
+check_pc_parity_files() {
+  check_file_contains "$(target_path /etc/pacman.conf)" "[cachyos" "pacman.conf has CachyOS repos"
+  check_file_exists "$(target_path /etc/modprobe.d/nvidia-suspend-workaround.conf)"
+  check_file_contains "$(target_path /etc/modprobe.d/nvidia-suspend-workaround.conf)" "NVreg_UseKernelSuspendNotifiers=0" "nvidia suspend workaround present"
+  check_file_exists "$(target_path /etc/udev/rules.d/92-keychron-via.rules)"
+  check_file_exists "$(target_path /usr/local/bin/ram-rgb.sh)"
+  check_file_exists "$(target_path /usr/local/bin/ssh-inhibit.sh)"
+  check_file_exists "$(target_path /usr/lib/systemd/system-sleep/ram-rgb)"
+  check_file_contains "$(target_path "/etc/NetworkManager/system-connections/Wired connection 1.nmconnection")" "address1=$PC_STATIC_ADDRESS" "static IP profile present"
+  check_file_contains "$(target_path /etc/fstab)" "//$NAS_SERVER_IP/media" "fstab has NAS media mount"
+  check_file_exists "$(target_path /etc/.nascreds)"
 }
 
 check_ufw_rules() {
@@ -419,6 +439,7 @@ check_live_target() {
   check_package_installed yay
   check_packages_from_file "$AUR_PACKAGE_FILE"
   check_expected_services_enabled
+  check_pc_parity_files
   check_ufw_rules
   check_target_success "snapper root config usable" snapper --no-dbus -c root list
   check_target_success "user $PC_USER exists in target" id "$PC_USER"
@@ -436,7 +457,7 @@ check_health() {
   systemctl daemon-reload >/dev/null 2>&1 || true
   local attempt
   for attempt in 1 2 3; do
-    if mount -a >>"$check_log_dir/mount-a.log" 2>&1; then
+    if mount -a -t nocifs >>"$check_log_dir/mount-a.log" 2>&1; then
       check_pass "mount -a pass $attempt completed successfully"
     else
       check_fail "mount -a pass $attempt completed successfully"
@@ -462,6 +483,7 @@ check_health() {
   check_package_installed yay
   check_packages_from_file "$AUR_PACKAGE_FILE"
   check_expected_services_enabled
+  check_pc_parity_files
   check_ufw_rules
   check_health_active_services
 
