@@ -28,16 +28,11 @@ fi
 
 mkdir -p "$HOME/.local/bin" "$HOME/.config/systemd/user"
 install -m755 "$repo_root/config/wol/pc-blank-displays" "$HOME/.local/bin/pc-blank-displays"
-install -m644 "$repo_root/config/wol/pc-blank-displays.service" "$HOME/.config/systemd/user/pc-blank-displays.service"
 
 sudo systemctl daemon-reload
 sudo systemctl enable --now pc-wol.service
 
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
-if systemctl --user daemon-reload >/dev/null 2>&1; then
-  systemctl --user disable pc-blank-displays.service >/dev/null 2>&1 || true
-else
-  echo "User systemd is not reachable from this shell; installed pc-blank-displays but did not enable it." >&2
-fi
+systemctl --user daemon-reload >/dev/null 2>&1 || true
 
 echo "Installed WOL support. Check firmware settings if wake from S4/S5 still fails."
