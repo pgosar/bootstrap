@@ -422,6 +422,8 @@ check_managed_config_artifacts() {
     nas-secrets) installed_path="/usr/local/bin/nas-secrets"; expected_mode="755" ;;
     immich-album-router.sh) installed_path="/usr/local/sbin/immich-album-router.sh"; expected_mode="755" ;;
     snapraid-sync.sh | snapraid-scrub.sh | minecraft-sync.sh | atuin-server-setup.sh) installed_path="/usr/local/bin/$source_name"; expected_mode="755" ;;
+    homekit-discovery-watchdog) installed_path="/usr/local/sbin/homekit-discovery-watchdog"; expected_mode="755" ;;
+    igmp-querier.py) installed_path="/usr/local/sbin/igmp-querier.py"; expected_mode="755" ;;
     nas-*) installed_path="/usr/local/sbin/$source_name"; expected_mode="755" ;;
     *)
       check_fail "bootstrap config source has an explicit installed-artifact check: $source_name"

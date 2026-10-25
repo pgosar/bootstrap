@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import socket, struct, time
 
 SRC = "192.168.1.218"
