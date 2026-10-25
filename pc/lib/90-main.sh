@@ -93,6 +93,7 @@ enable_services() {
     enable_target_unit sshd
     [[ "$ENABLE_FSTRIM_TIMER" == "true" ]] && enable_target_unit fstrim.timer
     enable_target_unit snapper-cleanup.timer
+    enable_target_unit logrotate.timer
     if [[ "$ENABLE_SNAPPER_TIMELINE" == "true" ]]; then
       enable_target_unit snapper-timeline.timer
     else

@@ -407,6 +407,7 @@ check_expected_services_enabled() {
   check_unit_enabled sshd
   [[ "$ENABLE_FSTRIM_TIMER" == "true" ]] && check_unit_enabled fstrim.timer
   check_unit_enabled snapper-cleanup.timer
+  check_unit_enabled logrotate.timer
   if [[ "$ENABLE_SNAPPER_TIMELINE" == "true" ]]; then
     check_unit_enabled snapper-timeline.timer
   else
