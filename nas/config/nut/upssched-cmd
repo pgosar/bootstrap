@@ -1,6 +1,5 @@
 #!/bin/bash
-# Called by upssched on timer expiry (5 min on battery) or low battery.
-# Triggers a graceful shutdown so the NAS never dies mid-write.
+# Called by upssched on timer expiry or low battery.
 case "$1" in
   onbatt-shutdown|fast-shutdown)
     logger -t upssched "UPS event ($1): initiating graceful shutdown"

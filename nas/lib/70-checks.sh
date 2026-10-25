@@ -455,7 +455,13 @@ check_managed_config_artifacts() {
     "sysctl/99-ipv4-only.conf|/etc/sysctl.d/99-ipv4-only.conf|644" \
     "sysctl/99-swappiness.conf|/etc/sysctl.d/99-swappiness.conf|644" \
     "network/nas-ipv4-ethernet.nmconnection|/etc/NetworkManager/system-connections/nas-ipv4-ethernet.nmconnection|600" \
-    "ssh/99-ipv4-only.conf|/etc/ssh/sshd_config.d/99-ipv4-only.conf|644"; do
+    "ssh/99-ipv4-only.conf|/etc/ssh/sshd_config.d/99-ipv4-only.conf|644" \
+    "nut/nut.conf|/etc/nut/nut.conf|644" \
+    "nut/ups.conf|/etc/nut/ups.conf|644" \
+    "nut/upsd.conf|/etc/nut/upsd.conf|640" \
+    "nut/upssched.conf|/etc/nut/upssched.conf|644" \
+    "nut/upssched-cmd|/usr/bin/upssched-cmd|755" \
+    "tmpfiles.d/nas-uptime.conf|/etc/tmpfiles.d/nas-uptime.conf|640"; do
     IFS='|' read -r source_relative installed_relative mode <<<"$mapping"
     installed_file="$(target_path "$installed_relative")"
     check_file_matches_source "$NAS_ROOT/config/$source_relative" "$installed_file" "$installed_relative matches bootstrap source"
