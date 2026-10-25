@@ -240,14 +240,16 @@ configure_nas_mounts() {
     return 0
   fi
   [[ -f "$fstab" ]] || die "fstab not found: $fstab"
-  if ! grep -q '# pc-bootstrap: nas mounts' "$fstab"; then
+  if ! grep -q '# NAS Shared Folders' "$fstab"; then
     backup_file "$fstab"
     {
-      printf '# pc-bootstrap: nas mounts\n'
+      printf '\n# NAS Shared Folders\n'
       local share
       for share in "${NAS_SHARES[@]}"; do
+        printf '\n# %s\n' "$share"
         printf '//%s/%s /home/%s/Server/%s cifs credentials=/etc/.nascreds,uid=1000,gid=1000,dir_mode=0775,file_mode=0664,_netdev,nofail,x-systemd.automount,x-systemd.idle-timeout=60 0 0\n' "$NAS_SERVER_IP" "$share" "$PC_USER" "$share"
       done
+      printf '\n'
     } >>"$fstab"
   fi
   local share
