@@ -188,6 +188,9 @@ configure_pc_system_files() {
     run install -d "$(target_path /etc/libvirt/storage/autostart)"
     run ln -sf /etc/libvirt/storage/chilly.xml "$(target_path /etc/libvirt/storage/autostart/chilly.xml)"
     run ln -sf /etc/libvirt/storage/default.xml "$(target_path /etc/libvirt/storage/autostart/default.xml)"
+    run install -Dm 0600 "$PC_ROOT/config/libvirt/network-default.xml" "$(target_path /etc/libvirt/qemu/networks/default.xml)"
+    run install -d "$(target_path /etc/libvirt/qemu/networks/autostart)"
+    run ln -sf ../default.xml "$(target_path /etc/libvirt/qemu/networks/autostart/default.xml)"
   else
     log "+ install PC system files (nvidia workaround, keychron rule, remove-nvidia, docker/lact/plasmalogin configs, keyd, sysctl, sleep mode, mkinitcpio drop-ins, hwdb, logrotate, mcpelauncher links)"
   fi
