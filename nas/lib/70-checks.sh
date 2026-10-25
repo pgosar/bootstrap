@@ -542,9 +542,9 @@ check_common_data_mounts() {
         check_pass "$path is an ordinary protected directory"
       fi
       case "$directory" in
-      .secrets-encrypted) expected_mode="700" ;;
+      .secrets-encrypted) expected_mode="2700" ;;
       personal | backups) expected_mode="2770" ;;
-      *) expected_mode="775" ;;
+      *) expected_mode="2775" ;;
       esac
       check_owner_mode "$path" "$PUID:$PGID" "$expected_mode" "$path ownership and mode"
     done
@@ -552,7 +552,7 @@ check_common_data_mounts() {
       path="$mountpoint/pool/$subvol"
       check_dir_exists "$path"
       check_btrfs_subvolume "$path"
-      check_owner_mode "$path" "$PUID:$PGID" "775" "$path ownership and mode"
+      check_owner_mode "$path" "$PUID:$PGID" "2775" "$path ownership and mode"
     done
     check_dir_exists "$mountpoint/pool/media/torrents"
     check_owner_mode "$mountpoint/pool/media/torrents" "$PUID:$PGID" "2775" "$mountpoint/pool/media/torrents ownership and mode"
