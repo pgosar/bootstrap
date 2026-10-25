@@ -483,6 +483,9 @@ write_fresh_install_fstab() {
   if [[ "$APPLY" == true ]]; then
     [[ -e "$fstab" ]] && backup_file "$fstab"
     genfstab -U "$target_root" >"$fstab"
+    # The live machine's ESP entry uses the stricter umask, not the
+    # genfstab default masks.
+    sed -i -E 's|([[:space:]]vfat[[:space:]]+)[^[:space:]]+|\1defaults,umask=0077|' "$fstab"
   else
     log "+ genfstab -U $(printf '%q' "$target_root") > $(printf '%q' "$fstab")"
   fi

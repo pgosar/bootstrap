@@ -486,6 +486,7 @@ check_pc_parity_files() {
   check_file_contains "$(target_path /etc/fuse.conf)" "user_allow_other" "fuse.conf allows FUSE allow_other"
   check_file_contains "$(target_path /etc/environment)" "EDITOR=nvim" "environment sets EDITOR to nvim"
   check_file_contains "$(target_path /etc/os-release)" "ID=arch" "os-release carries the live Arch branding"
+  check_file_contains "$(target_path /etc/fstab)" "umask=0077" "ESP fstab entry uses umask=0077"
   check_file_exists "$(target_path /etc/pacman.d/hooks/cachyos-branding.hook)"
   check_file_exists "$(target_path /etc/pacman.d/hooks/cachyos-plymouth-initramfs.hook)"
   check_file_exists "$(target_path /etc/pacman.d/hooks/cachyos-reboot-required.hook)"
