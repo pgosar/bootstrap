@@ -27,6 +27,11 @@ create_os_subvolumes() {
       fi
       ensure_dir "$temp_mount$path"
     done
+    if [[ -e "$temp_mount/@/.snapshots" ]]; then
+      log "OS subvolume already exists: @/.snapshots"
+    else
+      run btrfs subvolume create "$temp_mount/@/.snapshots"
+    fi
   else
     log "+ mount -o $(printf '%q' "$BTRFS_OS_MOUNT_OPTS") $(printf '%q' "$root_partition") $(printf '%q' "$temp_mount")"
     log "+ create btrfs subvolumes under $temp_mount"
@@ -94,13 +99,18 @@ configure_grub_defaults() {
   local content
   content="$(cat <<EOF
 GRUB_DEFAULT=0
-GRUB_TIMEOUT_STYLE=menu
-GRUB_TIMEOUT=3
-GRUB_DISTRIBUTOR="Arch"
-GRUB_CMDLINE_LINUX_DEFAULT="nowatchdog nvme_load=YES zswap.enabled=0 splash loglevel=3 rootflags=subvol=@"
+GRUB_TIMEOUT='5'
+GRUB_DISTRIBUTOR='Arch'
+GRUB_CMDLINE_LINUX_DEFAULT='nowatchdog nvme_load=YES zswap.enabled=0 splash loglevel=3 video=DP-3:e drm.edid_firmware=DP-3:edid/phantom.bin'
 GRUB_CMDLINE_LINUX=""
 GRUB_PRELOAD_MODULES="part_gpt part_msdos"
-GRUB_DISABLE_RECOVERY="true"
+GRUB_TIMEOUT_STYLE=menu
+GRUB_TERMINAL_INPUT=console
+GRUB_GFXMODE=auto
+GRUB_GFXPAYLOAD_LINUX=keep
+GRUB_DISABLE_RECOVERY='true'
+GRUB_DISABLE_SUBMENU='false'
+GRUB_TOP_LEVEL='/boot/vmlinuz-linux-cachyos'
 EOF
 )"
   write_text "$grub_default" "$content"
@@ -178,6 +188,8 @@ install_arch_system() {
     base
     base-devel
     "$KERNEL_PACKAGE"
+    "$KERNEL_HEADERS_PACKAGE"
+    "${KERNEL_EXTRA_PACKAGES[@]}"
     linux-firmware
     "$MICROCODE_PACKAGE"
     btrfs-progs
@@ -187,15 +199,22 @@ install_arch_system() {
     openssh
     git
     python
-    vim
     neovim
-    tmux
     inetutils
   )
   if [[ "$APPLY" == true ]]; then
-    run pacman -Sy --noconfirm
-    check_pacman_packages_available "${pacstrap_packages[@]}"
-    run pacstrap -K "$target_root" "${pacstrap_packages[@]}"
+    local pacstrap_conf="$STAGING_DIR/pacstrap-pacman.conf"
+    run mkdir -p "$STAGING_DIR"
+    run cp /etc/pacman.conf "$pacstrap_conf"
+    add_cachyos_repo_sections "$pacstrap_conf"
+    set_pacman_conf_basics "$pacstrap_conf"
+    install_cachyos_keyring_host
+    run pacman --config "$pacstrap_conf" -Sy --noconfirm
+    local _pkg
+    for _pkg in "${pacstrap_packages[@]}"; do
+      pacman --config "$pacstrap_conf" -Si "$_pkg" >/dev/null 2>&1 || die "official package is not available in configured pacman repos: $_pkg"
+    done
+    run pacstrap -C "$pacstrap_conf" -K "$target_root" "${pacstrap_packages[@]}"
   else
     log "+ pacstrap -K $(printf '%q' "$target_root") ..."
   fi

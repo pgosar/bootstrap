@@ -38,9 +38,17 @@ OS_DISK="/dev/disk/by-id/REPLACE_ME_OS_DISK"
 EFI_PARTITION="/dev/disk/by-id/REPLACE_ME_OS_DISK-part1"
 ROOT_PARTITION="/dev/disk/by-id/REPLACE_ME_OS_DISK-part2"
 BOOTLOADER="grub"
-GRUB_BOOTLOADER_ID="Arch"
-KERNEL_PACKAGE="linux"
-KERNEL_HEADERS_PACKAGE="linux-headers"
+GRUB_BOOTLOADER_ID="cachyos"
+KERNEL_PACKAGE="linux-cachyos"
+KERNEL_HEADERS_PACKAGE="linux-cachyos-headers"
+KERNEL_EXTRA_PACKAGES=(
+  linux-cachyos-lts
+  linux-cachyos-lts-headers
+  linux-cachyos-nvidia-open
+  linux-cachyos-lts-nvidia-open
+)
+CACHYOS_VARIANT="znver4"
+CACHYOS_KEY_FPR="882DCFE48E2051D48E2562ABF3B607488DB35A47"
 MICROCODE_PACKAGE="amd-ucode"
 INSTALL_MICROCODE="true"
 BTRFS_OS_MOUNT_OPTS="rw,noatime,compress=zstd:1"
@@ -53,7 +61,6 @@ ROOT_SUBVOL_LAYOUT=(
   "@cache|/var/cache"
   "@tmp|/var/tmp"
   "@log|/var/log"
-  "@snapshots|/.snapshots"
 )
 USER_SUPPLEMENTAL_GROUPS=(
   wheel
@@ -67,6 +74,9 @@ USER_SUPPLEMENTAL_GROUPS=(
   docker
   users
   nopasswdlogin
+  sys
+  input
+  gamemode
 )
 ENABLE_UFW="true"
 KDECONNECT_LAN_CIDR="192.168.1.0/24"
@@ -75,8 +85,7 @@ ENABLE_SYSTEMD_RESOLVED="true"
 ENABLE_NETWORKMANAGER="true"
 ENABLE_BLUETOOTH="true"
 ENABLE_LIBVIRTD="true"
-ENABLE_LY="true"
-LY_UNIT="ly@tty2.service"
+ENABLE_PLASMALOGIN="true"
 ENABLE_AVAHI="true"
 ENABLE_FSTRIM_TIMER="true"
 ENABLE_SMARTD="false"
@@ -85,6 +94,21 @@ ENABLE_PODMAN="true"
 ENABLE_DISTROBOX="true"
 ENABLE_FIREFOX="true"
 ENABLE_ZSH="true"
+ENABLE_TAILSCALED="true"
+ENABLE_DOCKER="true"
+ENABLE_KEYD="true"
+ENABLE_LACTD="true"
+ENABLE_SSH_INHIBIT="true"
+ENABLE_RAM_RGB="true"
+ENABLE_PC_WOL="true"
+SETUP_DOTFILES="true"
+PC_WOL_INTERFACE="enp9s0"
+NAS_SERVER_IP="192.168.1.218"
+NAS_SHARES=(media personal torrents replicas backups staging)
+NAS_CREDS_SOURCE=""
+PC_STATIC_ADDRESS="192.168.1.50/24"
+PC_GATEWAY="192.168.1.254"
+PC_DNS="1.1.1.1;8.8.8.8;"
 START_SERVICES_AFTER_ENABLE="false"
 ALLOW_RAW_DEV_PATHS="false"
 ALLOW_QEMU_DEVICE_NAMES="false"
