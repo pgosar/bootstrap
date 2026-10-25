@@ -4,8 +4,10 @@ set_pacman_conf_basics() {
   # Stock pacman only accepts x86_64 packages unless the v3/v4 levels are
   # listed explicitly (auto-detection of the levels is a CachyOS-pacman
   # feature); the CachyOS znver4 packages require x86_64_v4 here.
+  local arch_list="x86_64 x86_64_v3 x86_64_v4"
+  [[ "${CACHYOS_VARIANT:-znver4}" == "v3" ]] && arch_list="x86_64 x86_64_v3"
   sed -i '/^[#[:space:]]*Architecture[[:space:]]*=/d' "$pacman_conf"
-  sed -i 's/^\[options\]/[options]\nArchitecture = x86_64 x86_64_v3 x86_64_v4/' "$pacman_conf"
+  sed -i "s/^\[options\]/[options]\nArchitecture = $arch_list/" "$pacman_conf"
   if grep -Eq '^[#[:space:]]*ParallelDownloads[[:space:]]*=' "$pacman_conf"; then
     sed -i 's/^[#[:space:]]*ParallelDownloads[[:space:]]*=.*/ParallelDownloads = 50/' "$pacman_conf"
   else
@@ -16,15 +18,17 @@ set_pacman_conf_basics() {
 
 cachyos_repo_sections() {
   local variant="${CACHYOS_VARIANT:-znver4}"
+  local mirrorlist="cachyos-v4-mirrorlist"
+  [[ "$variant" == "v3" ]] && mirrorlist="cachyos-v3-mirrorlist"
   cat <<EOF
 [cachyos-$variant]
-Include = /etc/pacman.d/cachyos-v4-mirrorlist
+Include = /etc/pacman.d/$mirrorlist
 
 [cachyos-core-$variant]
-Include = /etc/pacman.d/cachyos-v4-mirrorlist
+Include = /etc/pacman.d/$mirrorlist
 
 [cachyos-extra-$variant]
-Include = /etc/pacman.d/cachyos-v4-mirrorlist
+Include = /etc/pacman.d/$mirrorlist
 
 [cachyos]
 Include = /etc/pacman.d/cachyos-mirrorlist
