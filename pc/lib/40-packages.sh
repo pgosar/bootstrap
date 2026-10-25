@@ -43,13 +43,23 @@ install_cachyos_keyring_host() {
   if pacman-key --list-keys 2>/dev/null | grep -q "$CACHYOS_KEY_FPR"; then
     return 0
   fi
+  # The cachyos-repo bundle tarball is gone from the mirror; do what
+  # upstream's cachyos-repo.sh does now: trust the key, then install the
+  # keyring/mirrorlist packages from the repo (names resolved from its
+  # index, versions unpinned).
+  run pacman-key --recv-keys "$CACHYOS_KEY_FPR" --keyserver keyserver.ubuntu.com
+  run pacman-key --lsign-key "$CACHYOS_KEY_FPR"
   local staging="$STAGING_DIR/cachyos-repo"
   run mkdir -p "$staging"
-  run curl -fsSL -o "$staging/cachyos-repo.tar.zst" "https://mirror.cachyos.org/cachyos-repo.tar.zst"
-  run tar -xf "$staging/cachyos-repo.tar.zst" -C "$staging"
+  local repo_url="https://mirror.cachyos.org/repo/x86_64/cachyos"
+  run curl -fsSL -o "$staging/repo-index.html" "$repo_url/"
+  local name
+  while IFS= read -r name; do
+    run curl -fsSL -o "$staging/$name" "$repo_url/$name"
+  done < <(grep -oE 'cachyos-(keyring|[a-z0-9-]*mirrorlist)-[0-9][^"]*\.pkg\.tar\.zst' "$staging/repo-index.html" | sort -u)
   local pkgs=() f
   while IFS= read -r f; do pkgs+=("$f"); done < <(find "$staging" -name "cachyos-keyring-*.pkg.tar.zst" -o -name "cachyos-*-mirrorlist-*.pkg.tar.zst")
-  [[ "${#pkgs[@]}" -gt 0 ]] || die "cachyos keyring/mirrorlist packages not found in repo bundle"
+  [[ "${#pkgs[@]}" -gt 0 ]] || die "cachyos keyring/mirrorlist packages not found in repo index"
   run pacman -U --noconfirm "${pkgs[@]}"
 }
 
