@@ -65,6 +65,8 @@ configure_operations_basics() {
   copy_with_backup "$NAS_ROOT/config/systemd/workstation-state-recorder.service" "$(target_path /etc/systemd/system/workstation-state-recorder.service)"
   run sed -i -e "s/__STATE_USER__/$NAS_USER/g" -e "s/__STATE_GROUP__/$NAS_GROUP/g" "$(target_path /etc/systemd/system/workstation-state-recorder.service)"
   copy_with_backup "$NAS_ROOT/config/systemd/workstation-state-recorder.timer" "$(target_path /etc/systemd/system/workstation-state-recorder.timer)"
+  copy_with_backup "$NAS_ROOT/config/systemd/amazon-cart.service" "$(target_path /etc/systemd/system/amazon-cart.service)"
+  run sed -i -e "s/__NAS_USER__/$NAS_USER/g" "$(target_path /etc/systemd/system/amazon-cart.service)"
   # Arch does not ship logrotate systemd units; install our own.
   copy_with_backup "$NAS_ROOT/config/systemd/logrotate.service" "$(target_path /etc/systemd/system/logrotate.service)"
   copy_with_backup "$NAS_ROOT/config/systemd/logrotate.timer" "$(target_path /etc/systemd/system/logrotate.timer)"
@@ -505,6 +507,7 @@ enable_services() {
   target_run systemctl enable nas-weekly-digest.timer
   target_run systemctl enable igmp-querier.service
   target_run systemctl enable homekit-discovery-watchdog.timer
+  target_run systemctl enable amazon-cart.service
   target_run systemctl enable workstation-state-recorder.timer
   target_run systemctl enable nas-recent-files.timer
   target_run systemctl enable nas-duplicate-report.timer

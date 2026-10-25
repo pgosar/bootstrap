@@ -375,6 +375,13 @@ check_managed_systemd_units() {
       else
         check_fail "$unit matches bootstrap source with configured user"
       fi
+    elif [[ "$unit" == amazon-cart.service ]]; then
+      # installer renders __NAS_USER__ placeholders (60-services.sh)
+      if [[ -f "$installed_file" ]] && cmp -s <(sed -e "s/__NAS_USER__/$NAS_USER/g" "$source_file") "$installed_file"; then
+        check_pass "$unit matches bootstrap source"
+      else
+        check_fail "$unit matches bootstrap source"
+      fi
     elif [[ "$unit" == workstation-state-recorder.service ]]; then
       # installer renders __STATE_USER__/__STATE_GROUP__ placeholders (60-services.sh)
       if [[ -f "$installed_file" ]] && cmp -s <(sed -e "s/__STATE_USER__/$NAS_USER/g" -e "s/__STATE_GROUP__/$NAS_GROUP/g" "$source_file") "$installed_file"; then
@@ -1142,6 +1149,7 @@ check_common_services() {
   check_path_exists "$(target_path /etc/systemd/system/homekit-discovery-watchdog.timer)"
   check_file_contains_literal "$(target_path /usr/local/sbin/homekit-discovery-watchdog)" "_hap._tcp" "discovery watchdog probes for the HomeKit bridge"
   check_unit_enabled homekit-discovery-watchdog.timer true
+  check_unit_enabled amazon-cart.service true
   check_path_exists "$(target_path /usr/local/bin/workstation-state-recorder)"
   check_path_exists "$(target_path /usr/local/bin/state-diff)"
   check_path_exists "$(target_path /usr/local/bin/workstation-state-prune)"
