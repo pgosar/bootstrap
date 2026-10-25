@@ -55,7 +55,7 @@ set default=0
 
 menuentry 'Automated Arch PC bootstrap' {
   search --no-floppy --label --set=archiso $ARCHISO_LABEL
-  linux (\$archiso)/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisosearchuuid=$ARCHISO_UUID ip=dhcp console=ttyS0,115200n8
+  linux (\$archiso)/arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisosearchuuid=$ARCHISO_UUID console=ttyS0,115200n8
   initrd (\$archiso)/arch/boot/x86_64/initramfs-linux.img
 }
 EOF
