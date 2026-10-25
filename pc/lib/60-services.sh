@@ -11,11 +11,11 @@ configure_service_files() {
   require_root
   if [[ "$APPLY" == true ]]; then
     ensure_dir "$(target_path /var/log)"
-    target_run install -Dm 0755 "$PC_ROOT/config/clipboard/pc-clipboard-pull" /usr/local/bin/pc-clipboard-pull
-    target_run install -Dm 0755 "$PC_ROOT/config/clipboard/pc-clipboard-publish" /usr/local/bin/pc-clipboard-publish
-    target_run install -Dm 0755 "$PC_ROOT/config/clipboard/pc-clipboard-watch" /usr/local/bin/pc-clipboard-watch
-    target_run install -Dm 0644 "$PC_ROOT/config/clipboard/nas-clipboard-pull.service" /etc/systemd/user/nas-clipboard-pull.service
-    target_run install -Dm 0644 "$PC_ROOT/config/clipboard/nas-clipboard-publish.service" /etc/systemd/user/nas-clipboard-publish.service
+    run install -Dm 0755 "$PC_ROOT/config/clipboard/pc-clipboard-pull" "$(target_path /usr/local/bin/pc-clipboard-pull)"
+    run install -Dm 0755 "$PC_ROOT/config/clipboard/pc-clipboard-publish" "$(target_path /usr/local/bin/pc-clipboard-publish)"
+    run install -Dm 0755 "$PC_ROOT/config/clipboard/pc-clipboard-watch" "$(target_path /usr/local/bin/pc-clipboard-watch)"
+    run install -Dm 0644 "$PC_ROOT/config/clipboard/nas-clipboard-pull.service" "$(target_path /etc/systemd/user/nas-clipboard-pull.service)"
+    run install -Dm 0644 "$PC_ROOT/config/clipboard/nas-clipboard-publish.service" "$(target_path /etc/systemd/user/nas-clipboard-publish.service)"
     run install -Dm 0755 "$PC_ROOT/../common/workstation-state/workstation-state-recorder" "$(target_path /usr/local/bin/workstation-state-recorder)"
     run install -Dm 0755 "$PC_ROOT/../common/workstation-state/workstation-state-prune" "$(target_path /usr/local/bin/workstation-state-prune)"
     run install -Dm 0644 "$PC_ROOT/config/workstation-state/workstation-state-recorder.service" "$(target_path /etc/systemd/system/workstation-state-recorder.service)"
@@ -35,25 +35,25 @@ configure_pc_service_files() {
     return 0
   fi
   # Wake-on-LAN support (folded in from bin/install-wol-support.sh)
-  target_run install -Dm 0755 "$PC_ROOT/config/wol/pc-arm-wol" /usr/local/sbin/pc-arm-wol
-  target_run install -Dm 0644 "$PC_ROOT/config/wol/pc-wol.service" /etc/systemd/system/pc-wol.service
+  run install -Dm 0755 "$PC_ROOT/config/wol/pc-arm-wol" "$(target_path /usr/local/sbin/pc-arm-wol)"
+  run install -Dm 0644 "$PC_ROOT/config/wol/pc-wol.service" "$(target_path /etc/systemd/system/pc-wol.service)"
   if [[ ! -f "$(target_path /etc/default/pc-wol)" ]]; then
     write_text "$(target_path /etc/default/pc-wol)" "WOL_INTERFACE=$PC_WOL_INTERFACE"
   fi
   target_run install -d -o "$PC_USER" -g "$PC_USER" "/home/$PC_USER/.local/bin" "/home/$PC_USER/.config/systemd/user"
-  target_run install -Dm 0755 "$PC_ROOT/config/wol/pc-blank-displays" "/home/$PC_USER/.local/bin/pc-blank-displays"
-  target_run install -Dm 0644 "$PC_ROOT/config/wol/pc-blank-displays.service" "/home/$PC_USER/.config/systemd/user/pc-blank-displays.service"
+  run install -Dm 0755 "$PC_ROOT/config/wol/pc-blank-displays" "$(target_path /home/$PC_USER/.local/bin/pc-blank-displays)"
+  run install -Dm 0644 "$PC_ROOT/config/wol/pc-blank-displays.service" "$(target_path /home/$PC_USER/.config/systemd/user/pc-blank-displays.service)"
   target_run chown "$PC_USER:$PC_USER" "/home/$PC_USER/.local/bin/pc-blank-displays" "/home/$PC_USER/.config/systemd/user/pc-blank-displays.service"
   # ssh-inhibit: keep the machine awake while SSH sessions are active
-  target_run install -Dm 0755 "$PC_ROOT/config/ssh-inhibit/ssh-inhibit.sh" /usr/local/bin/ssh-inhibit.sh
-  target_run install -Dm 0644 "$PC_ROOT/config/ssh-inhibit/ssh-inhibit.service" /etc/systemd/system/ssh-inhibit.service
+  run install -Dm 0755 "$PC_ROOT/config/ssh-inhibit/ssh-inhibit.sh" "$(target_path /usr/local/bin/ssh-inhibit.sh)"
+  run install -Dm 0644 "$PC_ROOT/config/ssh-inhibit/ssh-inhibit.service" "$(target_path /etc/systemd/system/ssh-inhibit.service)"
   # RAM RGB clock schedule
-  target_run install -Dm 0755 "$PC_ROOT/config/ram-rgb/ram-rgb.sh" /usr/local/bin/ram-rgb.sh
+  run install -Dm 0755 "$PC_ROOT/config/ram-rgb/ram-rgb.sh" "$(target_path /usr/local/bin/ram-rgb.sh)"
   local unit
   for unit in ram-rgb-on.service ram-rgb-off.service ram-rgb-on.timer ram-rgb-off.timer; do
-    target_run install -Dm 0644 "$PC_ROOT/config/ram-rgb/$unit" "/etc/systemd/system/$unit"
+    run install -Dm 0644 "$PC_ROOT/config/ram-rgb/$unit" "$(target_path /etc/systemd/system/$unit)"
   done
-  target_run install -Dm 0755 "$PC_ROOT/config/ram-rgb/ram-rgb.sleep" /usr/lib/systemd/system-sleep/ram-rgb
+  run install -Dm 0755 "$PC_ROOT/config/ram-rgb/ram-rgb.sleep" "$(target_path /usr/lib/systemd/system-sleep/ram-rgb)"
 }
 
 setup_dotfiles() {
