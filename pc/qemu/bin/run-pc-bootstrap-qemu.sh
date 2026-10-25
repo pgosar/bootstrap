@@ -81,14 +81,14 @@ base_qemu_args=(
   -drive "if=pflash,format=raw,readonly=on,file=$OVMF_CODE"
   -drive "if=pflash,format=raw,file=$WORKDIR/OVMF_VARS.fd"
   -virtfs "local,path=$REPO_ROOT,mount_tag=repo,security_model=none,readonly=on"
-  -netdev "user,id=net0,hostfwd=tcp::$SSH_PORT-:22"
-  -device "virtio-net-pci,netdev=net0"
   -display none
 )
 
 printf 'Running automated live ISO install...\n'
 "$QEMU_BIN" \
   "${base_qemu_args[@]}" \
+  -netdev "user,id=net0,hostfwd=tcp::$SSH_PORT-:22" \
+  -device "virtio-net-pci,netdev=net0" \
   -device qemu-xhci \
   -drive if=none,id=autofat,format=raw,readonly=on,file=fat:ro:"$AUTOBoot_DIR" \
   -device usb-storage,drive=autofat,bootindex=1 \
@@ -115,8 +115,13 @@ if ! grep -qF '[pc-qemu-stage1] complete' "$LOGDIR/qemu-install-serial.log"; the
 fi
 
 printf 'Booting installed system for health check...\n'
+# The installed guest autoconnects the static LAN profile (192.168.1.50/24,
+# gateway 192.168.1.254), so stage 2 puts slirp on that subnet and forwards
+# to the guest's real address; 10.0.2.15 never exists in the installed guest.
 "$QEMU_BIN" \
   "${base_qemu_args[@]}" \
+  -netdev "user,id=net0,net=192.168.1.0/24,host=192.168.1.254,hostfwd=tcp::$SSH_PORT-192.168.1.50:22" \
+  -device "virtio-net-pci,netdev=net0" \
   -drive if=none,id=osdisk,file="$WORKDIR/pc-os.qcow2",format=qcow2 \
   -device virtio-blk-pci,drive=osdisk,bootindex=1 \
   -serial file:"$LOGDIR/qemu-boot-serial.log" \
