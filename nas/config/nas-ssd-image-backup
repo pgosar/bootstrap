@@ -41,9 +41,9 @@ dd if=/dev/nvme0n1 bs=4M status=progress 2>>"$LOG" | zstd -T0 -f -o "$IMG" 2>>"$
 log "Verifying image integrity"
 zstd -t "$IMG" >>"$LOG" 2>&1 || fail "image integrity test failed"
 
-# Retention: keep 3 most recent, delete older
-log "Applying retention (keep 3)"
-ls -t "$DEST_DIR"/nas-nvme-*.img.zst 2>/dev/null | tail -n +4 | while read -r old; do
+# Retention: keep 1 most recent, delete older
+log "Applying retention (keep 1)"
+ls -t "$DEST_DIR"/nas-nvme-*.img.zst 2>/dev/null | tail -n +2 | while read -r old; do
     base="${old%.img.zst}"
     log "Removing old image $old"
     rm -f "$old" "$base.gpt.bak"
