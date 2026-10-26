@@ -8,8 +8,8 @@
     dateext
     compress
     delaycompress
-    create 0640 __NAS_USER__ __NAS_USER__
-    su __NAS_USER__ __NAS_USER__
+    create 0640 __NAS_USER__ __NAS_GROUP__
+    su __NAS_USER__ __NAS_GROUP__
 }
 
 /data/docker/appdata/nightly-orchestrator/pc-worker-ensure.log
