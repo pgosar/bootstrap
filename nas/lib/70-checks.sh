@@ -495,6 +495,8 @@ check_common_identity_and_base_os() {
   check_file_contains_literal "$(target_path /etc/hosts)" "127.0.1.1 $NAS_HOSTNAME.localdomain $NAS_HOSTNAME" "hosts file maps $NAS_HOSTNAME"
   check_file_contains_literal "$(target_path /etc/sudoers.d/10-wheel)" "%wheel ALL=(ALL:ALL) ALL" "wheel sudo policy installed"
   check_file_mode "$(target_path /etc/sudoers.d/10-wheel)" "440" "wheel sudo policy mode is 440"
+  check_file_contains_literal "$(target_path /etc/sudoers.d/chilly-nopasswd)" "$NAS_USER ALL=(ALL) NOPASSWD: ALL" "user passwordless sudo installed"
+  check_file_mode "$(target_path /etc/sudoers.d/chilly-nopasswd)" "440" "user passwordless sudo mode is 440"
   check_file_contains_literal "$(target_path /etc/pacman.conf)" "IgnorePkg   = linux linux-headers" "pacman pins kernel and headers"
   check_run_target id "$NAS_USER" >/dev/null 2>&1 && check_pass "$NAS_USER exists" || check_fail "$NAS_USER exists"
   check_run_target getent group "$NAS_GROUP" >/dev/null 2>&1 && check_pass "$NAS_GROUP group exists" || check_fail "$NAS_GROUP group exists"
