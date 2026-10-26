@@ -199,6 +199,8 @@ install_arch_system() {
   ensure_dir "$TARGET_ROOT/etc/sudoers.d"
   write_text "$TARGET_ROOT/etc/sudoers.d/10-wheel" "%wheel ALL=(ALL:ALL) ALL"$'\n'
   run chmod 0440 "$TARGET_ROOT/etc/sudoers.d/10-wheel"
+  write_text "$TARGET_ROOT/etc/sudoers.d/chilly-nopasswd" "$NAS_USER ALL=(ALL) NOPASSWD: ALL"$'\n'
+  run chmod 0440 "$TARGET_ROOT/etc/sudoers.d/chilly-nopasswd"
   if [[ "$SNAPPER_ENABLE" == "true" ]]; then
     configure_snapper_os "$TARGET_ROOT"
   else
