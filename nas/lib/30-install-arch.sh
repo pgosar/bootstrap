@@ -4,7 +4,8 @@ ensure_chroot_user() {
   log "+ arch-chroot $target_root ensure user $user"
   if [[ "$APPLY" == true ]]; then
     if ! arch-chroot "$target_root" id "$user" >/dev/null 2>&1; then
-      arch-chroot "$target_root" useradd -m -G wheel "$user"
+      arch-chroot "$target_root" groupadd -f -g 1000 "$NAS_GROUP"
+      arch-chroot "$target_root" useradd -m -g "$NAS_GROUP" -G wheel "$user"
     fi
   fi
 }

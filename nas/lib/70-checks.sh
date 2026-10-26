@@ -504,6 +504,11 @@ check_common_identity_and_base_os() {
   grep -Eq '(^| )wheel( |$)' <<<"$group_output" && check_pass "$NAS_USER is in wheel" || check_fail "$NAS_USER is in wheel"
   grep -Eq '(^| )docker( |$)' <<<"$group_output" && check_pass "$NAS_USER is in docker" || check_fail "$NAS_USER is in docker"
   grep -Eq "(^| )$NAS_GROUP( |$)" <<<"$group_output" && check_pass "$NAS_USER is in $NAS_GROUP" || check_fail "$NAS_USER is in $NAS_GROUP"
+  primary_group="$(check_run_target id -gn "$NAS_USER" 2>/dev/null || true)"
+  [[ "$primary_group" == "$NAS_GROUP" ]] && check_pass "$NAS_USER primary group is $NAS_GROUP" || check_fail "$NAS_USER primary group is $NAS_GROUP"
+  primary_gid="$(check_run_target id -g "$NAS_USER" 2>/dev/null || true)"
+  user_uid="$(check_run_target id -u "$NAS_USER" 2>/dev/null || true)"
+  [[ -n "$primary_gid" && "$primary_gid" == "$user_uid" ]] && check_pass "$NAS_GROUP gid matches $NAS_USER uid" || check_fail "$NAS_GROUP gid matches $NAS_USER uid"
   check_unit_enabled NetworkManager true
   if [[ "$TARGET_MODE" == "host" ]]; then
     check_unit_active NetworkManager true

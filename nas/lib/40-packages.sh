@@ -80,9 +80,10 @@ configure_users() {
   log "Phase: users and groups"
   target_run groupadd -f "$NAS_GROUP"
   if [[ "$APPLY" != true ]] || ! target_run_capture id "$NAS_USER" >/dev/null 2>&1; then
-    target_run useradd -m "$NAS_USER"
+    target_run useradd -m -g "$NAS_GROUP" "$NAS_USER"
   fi
-  target_run usermod -aG "wheel,docker,$NAS_GROUP" "$NAS_USER"
+  target_run usermod -g "$NAS_GROUP" "$NAS_USER"
+  target_run usermod -aG "wheel,docker" "$NAS_USER"
   # Set zsh as default shell (installed via PACMAN_PACKAGES).
   target_run chsh -s /bin/zsh "$NAS_USER"
   if [[ -n "$NAS_USER_PASSWORD" ]]; then
