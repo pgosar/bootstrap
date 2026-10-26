@@ -468,7 +468,7 @@ check_managed_config_artifacts() {
     "nut/upsd.conf|/etc/nut/upsd.conf|640" \
     "nut/upssched.conf|/etc/nut/upssched.conf|644" \
     "nut/upssched-cmd|/usr/bin/upssched-cmd|755" \
-    "tmpfiles.d/nas-uptime.conf|/etc/tmpfiles.d/nas-uptime.conf|640"; do
+    "tmpfiles.d/nas-uptime.conf|/etc/tmpfiles.d/nas-uptime.conf|644"; do
     IFS='|' read -r source_relative installed_relative mode <<<"$mapping"
     installed_file="$(target_path "$installed_relative")"
     check_file_matches_source "$NAS_ROOT/config/$source_relative" "$installed_file" "$installed_relative matches bootstrap source"
