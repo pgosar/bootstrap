@@ -367,6 +367,9 @@ check_managed_systemd_units() {
       [[ "$unit" == immich-ml-wake-proxy.service || "$unit" == tdarr-wake-monitor.service || "$unit" == tdarr-wake-monitor.timer ]]; then
       continue
     fi
+    if [[ "$AMAZON_CART_ENABLE" != "true" ]] && [[ "$unit" == amazon-cart.service ]]; then
+      continue
+    fi
     installed_file="$(target_path "/etc/systemd/system/$unit")"
     check_path_exists "$installed_file"
     if [[ "$unit" == immich-ml-wake-proxy.service || "$unit" == tdarr-wake-monitor.service ]]; then
@@ -1149,7 +1152,9 @@ check_common_services() {
   check_path_exists "$(target_path /etc/systemd/system/homekit-discovery-watchdog.timer)"
   check_file_contains_literal "$(target_path /usr/local/sbin/homekit-discovery-watchdog)" "_hap._tcp" "discovery watchdog probes for the HomeKit bridge"
   check_unit_enabled homekit-discovery-watchdog.timer true
-  check_unit_enabled amazon-cart.service true
+  if [[ "$AMAZON_CART_ENABLE" == "true" ]]; then
+    check_unit_enabled amazon-cart.service true
+  fi
   check_path_exists "$(target_path /usr/local/bin/workstation-state-recorder)"
   check_path_exists "$(target_path /usr/local/bin/state-diff)"
   check_path_exists "$(target_path /usr/local/bin/workstation-state-prune)"
