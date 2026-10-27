@@ -33,6 +33,10 @@ case "${resume_unix:-}" in
         ;;
 esac
 
+# The signature lags the resume by a few seconds (first Xid ~5s after the
+# suspend exit in both observed wedges); let it develop before counting.
+[ "$BOOT" = "0" ] && sleep 10
+
 start=$(( resume_unix - 5 ))
 xid=$(count_since "$start" "NVRM: Xid" "k")
 ebusy=$(count_since "$start" "Atomic commit failed")
