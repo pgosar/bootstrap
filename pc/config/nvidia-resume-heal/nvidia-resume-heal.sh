@@ -64,7 +64,12 @@ fi
 log "VT bounce did not clear the wedge"
 
 # Step 2: restart the compositor of whoever owns the running kwin_wayland.
-kwin_pid=$(pgrep -x kwin_wayland | head -1 || true)
+# Prefer a non-greeter kwin when both exist (the session is what wedges).
+kwin_pid=""
+for pid in $(pgrep -x kwin_wayland || true); do
+    kwin_pid=$pid
+    [ "$(stat -c %U "/proc/$pid" 2>/dev/null || echo "")" != "plasmalogin" ] && break
+done
 if [ -n "${kwin_pid:-}" ]; then
     kwin_user=$(stat -c %U "/proc/$kwin_pid" 2>/dev/null || echo "")
     if [ -n "$kwin_user" ]; then
