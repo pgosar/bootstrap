@@ -1,0 +1,6 @@
+#!/bin/sh
+# Post-resume hook: hand off to the NVIDIA wedge healer after suspend resumes.
+case "$1:$2" in
+  post:suspend) /usr/local/bin/nvidia-resume-heal ;;
+esac
+exit 0

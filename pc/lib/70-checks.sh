@@ -451,6 +451,8 @@ check_pc_parity_files() {
   check_file_exists "$(target_path /usr/local/bin/ram-rgb.sh)"
   check_file_exists "$(target_path /usr/local/bin/ssh-inhibit.sh)"
   check_file_exists "$(target_path /usr/lib/systemd/system-sleep/ram-rgb)"
+  check_file_exists "$(target_path /usr/local/bin/nvidia-resume-heal)"
+  check_file_exists "$(target_path /usr/lib/systemd/system-sleep/nvidia-resume-heal)"
   check_file_contains "$(target_path "/etc/NetworkManager/system-connections/Wired connection 1.nmconnection")" "address1=$PC_STATIC_ADDRESS" "static IP profile present"
   check_file_contains "$(target_path /etc/fstab)" "//$NAS_SERVER_IP/media" "fstab has NAS media mount"
   check_file_exists "$(target_path /etc/.nascreds)"

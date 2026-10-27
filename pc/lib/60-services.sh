@@ -55,6 +55,8 @@ configure_pc_service_files() {
     run install -Dm 0644 "$PC_ROOT/config/ram-rgb/$unit" "$(target_path /etc/systemd/system/$unit)"
   done
   run install -Dm 0755 "$PC_ROOT/config/ram-rgb/ram-rgb.sleep" "$(target_path /usr/lib/systemd/system-sleep/ram-rgb)"
+  run install -Dm 0755 "$PC_ROOT/config/nvidia-resume-heal/nvidia-resume-heal.sh" "$(target_path /usr/local/bin/nvidia-resume-heal)"
+  run install -Dm 0755 "$PC_ROOT/config/nvidia-resume-heal/nvidia-resume-heal.sleep" "$(target_path /usr/lib/systemd/system-sleep/nvidia-resume-heal)"
 }
 
 configure_docker_workers() {
