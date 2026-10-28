@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# Pull tracked image channels without recreating containers, then report drift from pinned digests.
+# Check tracked image channels against their pinned digests without
+# recreating containers. The pull is detection-only (policy change,
+# Oct 28, 2026): a downloaded newer copy is deleted again in the same
+# run and the channel tag is pointed back at the pinned image, so
+# updates are downloaded at pin-bump/rebuild time, not ahead of it.
 set -euo pipefail
 
 readonly DOCKER_ROOT="${NAS_CONTAINER_IMAGE_DOCKER_ROOT:-/data/docker}"
@@ -35,10 +39,20 @@ while IFS= read -r pinned_ref; do
     printf '%s\tpull failed\n' "$channel" >>"$tmp_errors"
     continue
   fi
+  pulled_id="$(docker image inspect "$channel" --format '{{.Id}}')"
   available_digest="$(docker image inspect "$channel" --format '{{range .RepoDigests}}{{println .}}{{end}}' |
     awk -v repository="${channel%:*}" -F '@' '$1 == repository || $1 == "docker.io/" repository || $1 == "docker.io/library/" repository {print $2; exit}')"
   if [[ -z "$available_digest" ]]; then
     available_digest="$(docker image inspect "$channel" --format '{{index .RepoDigests 0}}' | awk -F '@' '{print $2}')"
+  fi
+  # Detection-only cleanup: drop the copy this run downloaded and point
+  # the channel tag back at the pinned image, if it is present locally.
+  pinned_id="$(docker image inspect "$pinned_ref" --format '{{.Id}}' 2>/dev/null || true)"
+  if [[ -n "$pulled_id" && "$pulled_id" != "$pinned_id" ]]; then
+    docker image rm "$pulled_id" >/dev/null 2>&1 || true
+    if [[ -n "$pinned_id" ]]; then
+      docker tag "$pinned_id" "$channel" >/dev/null 2>&1 || true
+    fi
   fi
   if [[ -z "$available_digest" ]]; then
     printf '%s\tregistry digest unavailable\n' "$channel" >>"$tmp_errors"
