@@ -816,6 +816,8 @@ check_common_pc_worker_orchestration() {
   check_unit_enabled immich-ml-wake-proxy.service true
   check_unit_enabled tdarr-wake-monitor.timer true
   check_unit_enabled logrotate.timer true
+  check_path_exists "$(target_path /etc/systemd/system/nas-docker-image-prune.timer)"
+  check_unit_enabled nas-docker-image-prune.timer true
   if [[ "$TARGET_MODE" == "host" ]]; then
     check_unit_active immich-ml-wake-proxy.service true
     check_unit_active tdarr-wake-monitor.timer true
