@@ -32,7 +32,7 @@ create_os_subvolumes() {
   run mount -o "$BTRFS_OS_MOUNT_OPTS" "$root_partition" "$temp_mount"
 
   local subvol
-  for subvol in @ @home @log @pkg @snapshots @swap; do
+  for subvol in @ @home @log @pkg @snapshots @swap @containerd; do
     if [[ "$APPLY" == true && -e "$temp_mount/$subvol" ]]; then
       log "OS subvolume already exists: $subvol"
     else
@@ -176,12 +176,14 @@ install_arch_system() {
   ensure_safe_mountpoint "$TARGET_ROOT/var/cache/pacman/pkg"
   ensure_safe_mountpoint "$TARGET_ROOT/.snapshots"
   ensure_safe_mountpoint "$TARGET_ROOT/swap"
+  ensure_safe_mountpoint "$TARGET_ROOT/var/lib/containerd"
   ensure_safe_mountpoint "$TARGET_ROOT/boot"
   run mount -o "$BTRFS_OS_MOUNT_OPTS,subvol=@home" "$ROOT_PARTITION" "$TARGET_ROOT/home"
   run mount -o "$BTRFS_OS_MOUNT_OPTS,subvol=@log" "$ROOT_PARTITION" "$TARGET_ROOT/var/log"
   run mount -o "$BTRFS_OS_MOUNT_OPTS,subvol=@pkg" "$ROOT_PARTITION" "$TARGET_ROOT/var/cache/pacman/pkg"
   run mount -o "$BTRFS_OS_MOUNT_OPTS,subvol=@snapshots" "$ROOT_PARTITION" "$TARGET_ROOT/.snapshots"
   run mount -o "$BTRFS_OS_MOUNT_OPTS,subvol=@swap" "$ROOT_PARTITION" "$TARGET_ROOT/swap"
+  run mount -o "$BTRFS_OS_MOUNT_OPTS,subvol=@containerd" "$ROOT_PARTITION" "$TARGET_ROOT/var/lib/containerd"
   run mount "$EFI_PARTITION" "$TARGET_ROOT/boot"
   if [[ "$APPLY" == true ]]; then
     check_host_pacman_packages_available "${pacstrap_packages[@]}"
