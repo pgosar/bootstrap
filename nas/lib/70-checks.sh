@@ -540,6 +540,7 @@ check_common_os_mounts() {
   check_mount_option_contains_any "$(active_mount_path /home)" "/home uses @home subvolume" "subvol=@home" "subvol=/@home"
   check_mount_option_contains_any "$(active_mount_path /var/log)" "/var/log uses @log subvolume" "subvol=@log" "subvol=/@log"
   check_mount_option_contains_any "$(active_mount_path /var/cache/pacman/pkg)" "/var/cache/pacman/pkg uses @pkg subvolume" "subvol=@pkg" "subvol=/@pkg"
+  check_mount_option_contains_any "$(active_mount_path /var/lib/containerd)" "/var/lib/containerd uses @containerd subvolume" "subvol=@containerd" "subvol=/@containerd"
   check_mount_option_contains_any "$(active_mount_path /.snapshots)" "/.snapshots uses @snapshots subvolume" "subvol=@snapshots" "subvol=/@snapshots"
   if [[ "$SWAP_ENABLE" == "true" ]]; then
     check_mount_exists "$(active_mount_path "$SWAP_MOUNT")"
