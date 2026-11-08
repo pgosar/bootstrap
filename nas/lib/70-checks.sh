@@ -922,7 +922,7 @@ check_common_snapraid_btrbk_samba() {
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-scrub.sh)" "/run/lock/snapraid-operation.lock" "SnapRAID scrub uses the shared operation lock"
     check_file_contains_literal "$(target_path /usr/local/bin/snapraid-scrub.sh)" "latest SnapRAID sync result" "SnapRAID scrub defers after a failed sync"
     check_file_contains_literal "$(target_path /etc/systemd/system/snapraid-sync.timer)" "OnCalendar=Mon..Sat *-*-* 02:15:00" "overnight SnapRAID sync avoids Sunday scrub"
-    check_file_contains_literal "$(target_path /etc/systemd/system/snapraid-scrub.timer)" "OnCalendar=Sun 00:30" "SnapRAID scrub owns early Sunday"
+    check_file_contains_literal "$(target_path /etc/systemd/system/snapraid-scrub.timer)" "OnCalendar=Sat 16:15" "SnapRAID scrub runs right after the Saturday sync"
   fi
 
   if [[ "$BTRBK_ENABLE" == "true" ]]; then
