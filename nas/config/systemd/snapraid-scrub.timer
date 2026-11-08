@@ -2,8 +2,11 @@
 Description=Run SnapRAID partial scrub weekly
 
 [Timer]
-# Reserve early Sunday for parity verification, before the PC-worker window.
-OnCalendar=Sun 00:30
+# Scrub right after the Saturday 15:15 sync, so the gap between sync and
+# scrub stays under an hour: files changed since the last sync read as soft
+# errors, and a 9-hour gap made them routine. Saturday afternoon is quiet
+# (evening ISO re-downloads and database dumps land after the scrub).
+OnCalendar=Sat 16:15
 RandomizedDelaySec=15m
 Persistent=true
 

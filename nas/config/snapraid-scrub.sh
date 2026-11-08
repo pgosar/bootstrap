@@ -28,8 +28,9 @@ status="${PIPESTATUS[0]}"
 if (( status != 0 )); then
   summary="$(tail -n 12 "$output_file")"
   # SnapRAID exits non-zero for every error class, including soft errors:
-  # files that changed since the last sync, which are expected in the gap
-  # between the daily sync and this weekly scrub. Only data errors (failed
+  # files that changed since the last sync. The scrub runs within the hour
+  # after the Saturday sync, so a soft error now means a file changed in
+  # that short window. Only data errors (failed
   # integrity checks) and io errors (disk read failures) are real failures.
   # If the summary counts cannot be parsed, fall through to failure.
   soft_errors="$(grep -oE '[0-9]+ soft errors' "$output_file" | tail -n 1 | grep -oE '^[0-9]+')"
