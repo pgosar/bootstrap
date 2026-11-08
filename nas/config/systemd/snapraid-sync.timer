@@ -2,8 +2,8 @@
 Description=Run SnapRAID sync about every 12 hours
 
 [Timer]
-# Keep overnight sync ahead of the 03:17 ISO check and 04:00 PC-worker window.
-# Sunday morning is reserved for scrub; the afternoon sync still runs daily.
+# Overnight sync runs Mon-Sat 02:15 and daily 15:15. The weekly scrub now
+# runs Saturday 16:15, right after the afternoon sync.
 OnCalendar=Mon..Sat *-*-* 02:15:00
 OnCalendar=*-*-* 15:15:00
 RandomizedDelaySec=30m
