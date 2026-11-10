@@ -25,6 +25,10 @@ trailing_bad() { # live boot only: EBUSY/pageflip lines in the last $1 seconds
     [ "${n:-0}" -ge 10 ]
 }
 
+pid_dead() { # $1 = pid; true when gone or a zombie
+    [ ! -d "/proc/$1" ] || grep -qs "^State:.*Z" "/proc/$1/status" 2>/dev/null
+}
+
 resume_unix=$(timeout 15 journalctl -b "$BOOT" -k -g "PM: suspend exit" --no-pager -o short-unix 2>/dev/null | tail -1 | cut -d. -f1)
 case "${resume_unix:-}" in
     ''|*[!0-9]*)
@@ -63,8 +67,9 @@ if ! trailing_bad 6; then
 fi
 log "VT bounce did not clear the wedge"
 
-# Step 2: restart the compositor of whoever owns the running kwin_wayland.
-# Prefer a non-greeter kwin when both exist (the session is what wedges).
+# Step 2: kill the wedged compositor first, then restart its service. A
+# service restart alone spawns a second kwin that cannot take over while
+# the wedged one still holds DRM master (seen Nov 9).
 kwin_pid=""
 for pid in $(pgrep -x kwin_wayland || true); do
     kwin_pid=$pid
@@ -72,9 +77,22 @@ for pid in $(pgrep -x kwin_wayland || true); do
 done
 if [ -n "${kwin_pid:-}" ]; then
     kwin_user=$(stat -c %U "/proc/$kwin_pid" 2>/dev/null || echo "")
-    if [ -n "$kwin_user" ]; then
-        timeout 30 systemctl --user -M "$kwin_user@" restart plasma-kwin_wayland.service || true
-        log "restarted plasma-kwin_wayland.service for $kwin_user"
+    kill "$kwin_pid" 2>/dev/null || true
+    for _ in 1 2 3 4 5; do
+        pid_dead "$kwin_pid" && break
+        sleep 1
+    done
+    if ! pid_dead "$kwin_pid"; then
+        kill -9 "$kwin_pid" 2>/dev/null || true
+        sleep 2
+    fi
+    if pid_dead "$kwin_pid"; then
+        if [ -n "$kwin_user" ]; then
+            timeout 30 systemctl --user -M "$kwin_user@" restart plasma-kwin_wayland.service || true
+            log "killed wedged kwin pid $kwin_pid; restarted plasma-kwin_wayland.service for $kwin_user"
+        fi
+    else
+        log "wedged kwin pid $kwin_pid would not die; skipping to reboot"
     fi
 fi
 sleep 8
@@ -83,14 +101,22 @@ if ! trailing_bad 6; then
     exit 0
 fi
 
-# Step 3: one guarded reboot per boot. The display is unusable either way;
-# a clean reboot is the recovery that has worked every time so far.
+# Step 3: one guarded reboot per boot. A direct reboot is refused here: the
+# hook runs inside the suspend transaction, so schedule it on a 15s timer.
 marker="/run/nvidia-resume-heal.rebooted-$(cat /proc/sys/kernel/random/boot_id)"
 if [ -e "$marker" ]; then
     log "still wedged after kwin restart; already auto-rebooted once this boot, giving up"
     exit 0
 fi
-touch "$marker"
-log "still wedged after kwin restart; rebooting (once per boot)"
-systemctl reboot
+if systemd-run --on-active=15s --unit=nvidia-resume-heal-reboot \
+        --description="Deferred reboot for NVIDIA resume wedge" \
+        /usr/bin/systemctl reboot 2>/dev/null; then
+    touch "$marker"
+    log "still wedged after kwin restart; reboot scheduled in 15s (once per boot)"
+elif (setsid sh -c 'sleep 15; /usr/bin/systemctl reboot' >/dev/null 2>&1 < /dev/null &); then
+    touch "$marker"
+    log "still wedged after kwin restart; reboot scheduled in 15s via fallback (once per boot)"
+else
+    log "still wedged after kwin restart; FAILED to schedule reboot, giving up"
+fi
 exit 0
