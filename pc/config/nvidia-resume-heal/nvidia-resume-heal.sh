@@ -19,14 +19,23 @@ count_since() { # $1 = start (unix), $2 = pattern, $3 = "k" for kernel log only
     timeout 15 journalctl "${args[@]}" 2>/dev/null | grep -c "$2" || true
 }
 
-trailing_bad() { # live boot only: EBUSY/pageflip lines in the last $1 seconds
-    local start=$(( $(date +%s) - $1 )) n
+trailing_bad() { # live boot only: wedge error lines in the last $1 seconds
+    local start=$(( $(date +%s) - $1 )) n m
     n=$(timeout 15 journalctl -b 0 --since "@$start" --no-pager -o cat 2>/dev/null | grep -cE "Atomic commit failed|Pageflip timed out" || true)
-    [ "${n:-0}" -ge 10 ]
+    m=$(timeout 15 journalctl -b 0 --since "@$start" --no-pager -o cat 2>/dev/null | grep -cE "drmModeListLessees|EACCESS" || true)
+    [ "${n:-0}" -ge 10 ] || [ "${m:-0}" -ge 1 ]
 }
 
 pid_dead() { # $1 = pid; true when gone or a zombie
     [ ! -d "/proc/$1" ] || grep -qs "^State:.*Z" "/proc/$1/status" 2>/dev/null
+}
+
+kwin_alive() { # true when a non-zombie kwin_wayland is running (pgrep matches zombies)
+    local pid
+    for pid in $(pgrep -x kwin_wayland || true); do
+        pid_dead "$pid" || return 0
+    done
+    return 1
 }
 
 resume_unix=$(timeout 15 journalctl -b "$BOOT" -k -g "PM: suspend exit" --no-pager -o short-unix 2>/dev/null | tail -1 | cut -d. -f1)
@@ -84,6 +93,7 @@ else
     done
 fi
 restarted=0
+kill_failed=0
 if [ -n "${kwin_pid:-}" ]; then
     kwin_user=$(stat -c %U "/proc/$kwin_pid" 2>/dev/null || echo "")
     kill "$kwin_pid" 2>/dev/null || true
@@ -108,6 +118,7 @@ if [ -n "${kwin_pid:-}" ]; then
             fi
         fi
     else
+        kill_failed=1
         log "wedged kwin pid $kwin_pid would not die; skipping to reboot"
     fi
 fi
@@ -115,7 +126,9 @@ sleep 8
 # Healed means a compositor is actually running AND the error spam stopped.
 # Errors stopping alone is not healing: the spam also stops when the wedged
 # kwin dies and nothing replaces it, leaving a black screen (seen Nov 10).
-if pgrep -x kwin_wayland >/dev/null 2>&1 && ! trailing_bad 6; then
+# A kill that failed leaves a silent D-state kwin holding DRM master, so
+# never call that healed: go straight to the reboot.
+if [ "$kill_failed" = "0" ] && kwin_alive && ! trailing_bad 6; then
     if [ "$restarted" = "1" ]; then
         log "healed by kwin restart"
     else
