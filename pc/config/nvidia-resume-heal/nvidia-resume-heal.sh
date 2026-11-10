@@ -69,12 +69,21 @@ log "VT bounce did not clear the wedge"
 
 # Step 2: kill the wedged compositor first, then restart its service. A
 # service restart alone spawns a second kwin that cannot take over while
-# the wedged one still holds DRM master (seen Nov 9).
+# the wedged one still holds DRM master (seen Nov 9). The kill can be slow:
+# a wedged kwin may sit in uninterruptible sleep in the driver, so wait
+# longer after KILL before giving up (seen Nov 10: took over 7s).
 kwin_pid=""
-for pid in $(pgrep -x kwin_wayland || true); do
-    kwin_pid=$pid
-    [ "$(stat -c %U "/proc/$pid" 2>/dev/null || echo "")" != "plasmalogin" ] && break
-done
+# Prefer the pid from the Xid line itself: it names the wedged compositor.
+xid_pid=$(timeout 15 journalctl -b "$BOOT" -k -g "NVRM: Xid" --no-pager -o cat 2>/dev/null | tail -1 | sed -n 's/.*pid=\([0-9]*\).*/\1/p')
+if [ -n "${xid_pid:-}" ] && [ "$(ps -o comm= -p "$xid_pid" 2>/dev/null || echo "")" = "kwin_wayland" ]; then
+    kwin_pid=$xid_pid
+else
+    for pid in $(pgrep -x kwin_wayland || true); do
+        kwin_pid=$pid
+        [ "$(stat -c %U "/proc/$pid" 2>/dev/null || echo "")" != "plasmalogin" ] && break
+    done
+fi
+restarted=0
 if [ -n "${kwin_pid:-}" ]; then
     kwin_user=$(stat -c %U "/proc/$kwin_pid" 2>/dev/null || echo "")
     kill "$kwin_pid" 2>/dev/null || true
@@ -84,20 +93,34 @@ if [ -n "${kwin_pid:-}" ]; then
     done
     if ! pid_dead "$kwin_pid"; then
         kill -9 "$kwin_pid" 2>/dev/null || true
-        sleep 2
+        for _ in 1 2 3 4 5 6 7 8 9 10; do
+            pid_dead "$kwin_pid" && break
+            sleep 1
+        done
     fi
     if pid_dead "$kwin_pid"; then
         if [ -n "$kwin_user" ]; then
-            timeout 30 systemctl --user -M "$kwin_user@" restart plasma-kwin_wayland.service || true
-            log "killed wedged kwin pid $kwin_pid; restarted plasma-kwin_wayland.service for $kwin_user"
+            if timeout 30 systemctl --user -M "$kwin_user@" restart plasma-kwin_wayland.service 2>/dev/null; then
+                restarted=1
+                log "killed wedged kwin pid $kwin_pid; restarted plasma-kwin_wayland.service for $kwin_user"
+            else
+                log "killed wedged kwin pid $kwin_pid; restart of plasma-kwin_wayland.service for $kwin_user FAILED"
+            fi
         fi
     else
         log "wedged kwin pid $kwin_pid would not die; skipping to reboot"
     fi
 fi
 sleep 8
-if ! trailing_bad 6; then
-    log "healed by kwin restart"
+# Healed means a compositor is actually running AND the error spam stopped.
+# Errors stopping alone is not healing: the spam also stops when the wedged
+# kwin dies and nothing replaces it, leaving a black screen (seen Nov 10).
+if pgrep -x kwin_wayland >/dev/null 2>&1 && ! trailing_bad 6; then
+    if [ "$restarted" = "1" ]; then
+        log "healed by kwin restart"
+    else
+        log "healed: kwin running, errors stopped"
+    fi
     exit 0
 fi
 
@@ -110,7 +133,7 @@ if [ -e "$marker" ]; then
 fi
 if systemd-run --on-active=15s --unit=nvidia-resume-heal-reboot \
         --description="Deferred reboot for NVIDIA resume wedge" \
-        /usr/bin/systemctl reboot 2>/dev/null; then
+        /usr/bin/systemctl reboot; then
     touch "$marker"
     log "still wedged after kwin restart; reboot scheduled in 15s (once per boot)"
 elif (setsid sh -c 'sleep 15; /usr/bin/systemctl reboot' >/dev/null 2>&1 < /dev/null &); then
