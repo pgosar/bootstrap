@@ -1,9 +1,9 @@
 #!/bin/bash
-# Post-resume healer for the NVIDIA 615.78 KWin wedge: after some resumes the
-# driver throws Xid 13 and kwin_wayland floods "Atomic commit failed: EBUSY"
-# with a frozen display while the system stays alive. Run by the
-# nvidia-resume-heal system-sleep hook after every resume; exits quietly
-# when the resume was healthy.
+# Post-resume healer for the NVIDIA KWin wedge: after some resumes the driver
+# throws Xid 13 and kwin_wayland either floods "Atomic commit failed: EBUSY"
+# with a frozen display, or dies outright leaving a black screen while the
+# system stays alive. Run by the nvidia-resume-heal system-sleep hook after
+# every resume; exits quietly when the resume was healthy.
 # NVIDIA_HEAL_BOOT / NVIDIA_HEAL_DRY_RUN exist for testing against old boots.
 
 set -u
@@ -55,12 +55,24 @@ xid=$(count_since "$start" "NVRM: Xid" "k")
 ebusy=$(count_since "$start" "Atomic commit failed")
 flips=$(count_since "$start" "Pageflip timed out")
 
-if [ "${xid:-0}" -lt 1 ] || { [ "${ebusy:-0}" -lt 30 ] && [ "${flips:-0}" -lt 3 ]; }; then
+# Healthy means the compositor is actually running AND the error counts are
+# low. A dead compositor is a wedge even when the error spam stopped: the
+# spam stops when the process dies (Nov 14: xid=18, ebusy=0, pageflips=0,
+# kwin a zombie, black screen, healer said "healthy").
+if kwin_alive && { [ "${xid:-0}" -lt 1 ] || { [ "${ebusy:-0}" -lt 30 ] && [ "${flips:-0}" -lt 3 ]; }; }; then
     log "resume healthy (xid=$xid ebusy=$ebusy pageflips=$flips)"
     exit 0
 fi
 
-log "WEDGE detected (xid=$xid ebusy=$ebusy pageflips=$flips)"
+# No kwin at all and no driver errors is not a wedge to heal (nothing was
+# running to die). Bail out quietly so we never reboot a healthy resume.
+if [ "${xid:-0}" -lt 1 ] && ! pgrep -x kwin_wayland >/dev/null 2>&1; then
+    log "no kwin running and no driver errors; nothing to heal"
+    exit 0
+fi
+
+if kwin_alive; then kwin_state="kwin alive"; else kwin_state="kwin DEAD"; fi
+log "WEDGE detected (xid=$xid ebusy=$ebusy pageflips=$flips $kwin_state)"
 if [ "$DRY" = "1" ]; then
     log "dry run: no recovery actions taken"
     exit 0
@@ -70,7 +82,9 @@ fi
 cur=$(fgconsole 2>/dev/null || echo 2)
 alt=3; [ "$cur" = "3" ] && alt=4
 chvt "$alt"; sleep 3; chvt "$cur"; sleep 6
-if ! trailing_bad 6; then
+# Errors stopping alone is not healing (same trap as the healthy check: a
+# dead kwin produces no error spam). Require a live compositor.
+if kwin_alive && ! trailing_bad 6; then
     log "healed by VT bounce (was on tty$cur)"
     exit 0
 fi
