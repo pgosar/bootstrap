@@ -40,7 +40,14 @@ echo "bigpicture-mode: layout set (DP-2 mode $M2 only, DP-1 and DP-3 disabled)"
 if [ -x /home/chilly/.local/bin/monitor-input.sh ]; then
   /home/chilly/.local/bin/monitor-input.sh 4k dp
 else
-  ddcutil setvcp 0x60 0x0f --display 2
+  # Fallback: resolve the display number by DRM connector, never hardcode it.
+  disp="$(ddcutil detect 2>/dev/null | awk '/^Display [0-9]+/ { num = $2 } /DRM_connector:/ && $2 == "card1-DP-2" { print num; exit }')"
+  if [ -n "$disp" ]; then
+    ddcutil setvcp 0x60 0x0f --display "$disp"
+  else
+    echo "bigpicture-mode: MSI panel not found in ddcutil detect" >&2
+    exit 1
+  fi
 fi
 
 # Wake the panel.
