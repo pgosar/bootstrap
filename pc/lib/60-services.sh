@@ -45,6 +45,11 @@ configure_pc_service_files() {
   target_run install -d -o "$PC_USER" -g "$PC_USER" "/home/$PC_USER/.local/bin" "/home/$PC_USER/.config/systemd/user"
   run install -Dm 0755 "$PC_ROOT/config/wol/pc-blank-displays" "$(target_path /home/$PC_USER/.local/bin/pc-blank-displays)"
   target_run chown "$PC_USER:$PC_USER" "/home/$PC_USER/.local/bin/pc-blank-displays"
+  # Monitor DDC/CI control + Steam Big Picture mode (4K panel only)
+  run install -Dm 0755 "$PC_ROOT/config/monitor/monitor-input.sh" "$(target_path /home/$PC_USER/.local/bin/monitor-input.sh)"
+  run install -Dm 0755 "$PC_ROOT/config/monitor/bigpicture-mode.sh" "$(target_path /home/$PC_USER/.local/bin/bigpicture-mode.sh)"
+  target_run chown "$PC_USER:$PC_USER" "/home/$PC_USER/.local/bin/monitor-input.sh" "/home/$PC_USER/.local/bin/bigpicture-mode.sh"
+  run install -Dm 0644 "$PC_ROOT/config/monitor/i2c-dev.conf" "$(target_path /etc/modules-load.d/i2c-dev.conf)"
   # ssh-inhibit: keep the machine awake while SSH sessions are active
   run install -Dm 0755 "$PC_ROOT/config/ssh-inhibit/ssh-inhibit.sh" "$(target_path /usr/local/bin/ssh-inhibit.sh)"
   run install -Dm 0644 "$PC_ROOT/config/ssh-inhibit/ssh-inhibit.service" "$(target_path /etc/systemd/system/ssh-inhibit.service)"

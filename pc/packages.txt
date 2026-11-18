@@ -48,6 +48,7 @@ fnm
 tree-sitter-cli
 diffutils
 difftastic
+ddcutil
 gdu
 fastfetch
 btop
