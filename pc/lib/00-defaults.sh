@@ -77,6 +77,7 @@ USER_SUPPLEMENTAL_GROUPS=(
   sys
   input
   gamemode
+  i2c
 )
 ENABLE_UFW="true"
 KDECONNECT_LAN_CIDR="192.168.1.0/24"
